@@ -5,6 +5,7 @@ import type { AIProvider } from './types.js';
 import { MinimaxAdapter } from './minimax.js';
 import { AnthropicAdapter } from './anthropic.js';
 import { OpenRouterAdapter } from './openrouter.js';
+import { MockAdapter } from './mock.js';
 
 export function createProvider(name: AIProviderName): AIProvider {
   switch (name) {
@@ -20,6 +21,8 @@ export function createProvider(name: AIProviderName): AIProvider {
       return new OpenRouterAdapter(process.env.OPENROUTER_MODEL);
     case 'local':
       throw new Error('Local LLM adapter is not implemented in v0.1');
+    case 'mock':
+      return new MockAdapter();
     default:
       throw new Error(`Unknown AI provider: ${name as string}`);
   }

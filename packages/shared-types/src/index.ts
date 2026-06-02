@@ -3,7 +3,7 @@
 // Place types here only if they are used by 2+ packages. Otherwise keep
 // them co-located with the package that owns them.
 
-export type AIProviderName = 'minimax' | 'anthropic' | 'openrouter' | 'local';
+export type AIProviderName = 'minimax' | 'anthropic' | 'openrouter' | 'local' | 'mock';
 
 export type RoastEventType =
   | 'charge'
