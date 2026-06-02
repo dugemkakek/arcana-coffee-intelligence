@@ -51,7 +51,12 @@ export function RoastChart({ samples, events }: Props) {
   }));
 
   return (
-    <div className="w-full h-80">
+    <div className="w-full" style={{ height: 360 }}>
+      {samples.length === 0 ? (
+        <div className="flex items-center justify-center h-full text-bean-500 text-sm">
+          No sample data for this roast.
+        </div>
+      ) : (
       <ResponsiveContainer width="100%" height="100%">
         <LineChart data={data} margin={{ top: 8, right: 16, left: 8, bottom: 8 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="#dcc4a0" />
@@ -101,6 +106,7 @@ export function RoastChart({ samples, events }: Props) {
           ))}
         </LineChart>
       </ResponsiveContainer>
+      )}
     </div>
   );
 }
