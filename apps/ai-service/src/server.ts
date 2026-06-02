@@ -135,7 +135,7 @@ async function main() {
   });
 
   // Default error handler with consistent shape
-  app.setErrorHandler((err, _req, reply) => {
+  app.setErrorHandler((err: Error, _req, reply) => {
     app.log.error({ err }, 'unhandled error');
     reply.code(500).send({ error: err.message ?? 'Internal server error', code: 'INTERNAL' });
   });

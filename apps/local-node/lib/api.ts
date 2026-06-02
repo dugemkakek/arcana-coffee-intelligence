@@ -1,6 +1,6 @@
 // Centralized API client for the Next.js UI.
 
-import type { RoastSummary, RoastDetail, ImportResult, AnalysisResponse } from '@arcana/shared-types';
+import type { RoastSummary, RoastDetail, ImportResult, AnalysisResponse } from '../src/shared/api';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
 

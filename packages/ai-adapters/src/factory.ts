@@ -1,6 +1,7 @@
 // @arcana/ai-adapters — provider factory.
 
-import type { AIProvider, AIProviderName } from './types.js';
+import type { AIProviderName } from '@arcana/shared-types';
+import type { AIProvider } from './types.js';
 import { MinimaxAdapter } from './minimax.js';
 import { AnthropicAdapter } from './anthropic.js';
 import { OpenRouterAdapter } from './openrouter.js';

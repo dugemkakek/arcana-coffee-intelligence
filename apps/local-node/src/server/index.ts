@@ -18,11 +18,8 @@ import Fastify from 'fastify';
 import cors from '@fastify/cors';
 import multipart from '@fastify/multipart';
 import fastifyStatic from '@fastify/static';
-import { mkdir, readFile } from 'node:fs/promises';
-import { existsSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { z } from 'zod';
 import { prisma } from '@arcana/db-local';
 import { parseArtisanJson, parseArtisanCsv } from '@arcana/importers';
 import type { RoastSessionImport, RoastEventType, RoastSample } from '@arcana/importers';
@@ -280,7 +277,16 @@ async function main() {
       notes: roast.notes ?? roast.greenLot.name,
     };
 
-    let aiRes;
+    let aiRes: {
+      provider: string;
+      modelName: string;
+      summary: string;
+      developmentPct: number;
+      rorStabilityScore: number;
+      issues: string[];
+      recommendations: string[];
+      tokensUsed?: { prompt?: number; completion?: number; total?: number };
+    };
     try {
       const res = await fetch(`${AI_SERVICE_URL}/analyze/roast`, {
         method: 'POST',
@@ -294,7 +300,7 @@ async function main() {
           code: 'AI_SERVICE_ERROR',
         });
       }
-      aiRes = await res.json();
+      aiRes = (await res.json()) as typeof aiRes;
     } catch (err) {
       return reply.code(503).send({
         error: `AI service unreachable at ${AI_SERVICE_URL}: ${(err as Error).message}`,

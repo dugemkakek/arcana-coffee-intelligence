@@ -26,11 +26,21 @@ model Tenant {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  users      User[]
-  locations  Location[]
-  machines   Machine[]
-  greenLots  GreenLot[]
-  products   Product[]
+  users                 User[]
+  locations             Location[]
+  machines              Machine[]
+  greenLots             GreenLot[]
+  products              Product[]
+  roastedInventory      RoastedInventory[]
+  inventoryAdjustments  InventoryAdjustment[]
+  roastSessions         RoastSession[]
+  roastProfiles         RoastProfile[]
+  externalSystems       ExternalSystem[]
+  externalProductMaps   ExternalProductMapping[]
+  externalOrders        ExternalOrder[]
+  salesAggregates       SalesAggregate[]
+  aiAnalyses            AiAnalysisRoast[]
+  aiPlans               AiSuggestionPlan[]
 }
 
 model User {
@@ -148,7 +158,10 @@ model Product {
   roastedInventory     RoastedInventory[]
   inventoryAdjustments InventoryAdjustment[]
   roastSessions        RoastSession[]
+  roastProfiles        RoastProfile[]
   salesAggregates      SalesAggregate[]
+  externalProductMaps  ExternalProductMapping[]
+  externalOrderItems   ExternalOrderItem[]
 }
 
 model ProductGreenMapping {
@@ -210,7 +223,7 @@ model RoastSession {
   roastDate           DateTime
   operator            User?     @relation("RoastSessionOperator", fields: [operatorUserId], references: [id])
   operatorUserId      String?
-  referenceProfile    RoastProfile? @relation(fields: [referenceProfileId], references: [id])
+  referenceProfile    RoastProfile? @relation("RoastSessionReference", fields: [referenceProfileId], references: [id])
   referenceProfileId  String?
   notes               String?
   source              String    @default("imported") // imported, live, manual
@@ -218,9 +231,10 @@ model RoastSession {
   createdAt           DateTime  @default(now())
   updatedAt           DateTime  @updatedAt
 
-  samplePoints RoastSamplePoint[]
-  events       RoastEvent[]
-  aiAnalyses   AiAnalysisRoast[]
+  samplePoints    RoastSamplePoint[]
+  events          RoastEvent[]
+  aiAnalyses      AiAnalysisRoast[]
+  profileSources  RoastProfile[]      @relation("RoastProfileSource")
 }
 
 model RoastSamplePoint {
@@ -252,13 +266,13 @@ model RoastProfile {
   productId             String?
   name                  String
   description           String?
-  sourceRoastSession    RoastSession @relation(fields: [sourceRoastSessionId], references: [id])
+  sourceRoastSession    RoastSession @relation("RoastProfileSource", fields: [sourceRoastSessionId], references: [id])
   sourceRoastSessionId  String
   isReference           Boolean  @default(true)
   createdAt             DateTime @default(now())
   updatedAt             DateTime @updatedAt
 
-  referencedBy RoastSession[]
+  referencedBy RoastSession[] @relation("RoastSessionReference")
 }
 
 // =====================================================================

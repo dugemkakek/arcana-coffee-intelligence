@@ -1,9 +1,9 @@
 // Arcana Coffee Intelligence — Electron main process.
 //
 // Pinned to Electron 13.x (the last major that supports Windows 7 SP1).
-// Loads the Next.js static export from file:// in production, or from
-// http://localhost:3000 in dev mode. Spawns the Fastify server as a
-// child process in production so the user only has to launch the .exe.
+// In dev, loads the Next.js dev server from http://localhost:3000.
+// In production, spawns both the Next.js server (port 3000) and the
+// Fastify API (port 4000) as child processes, then loads http://localhost:3000.
 
 const { app, BrowserWindow, shell, dialog } = require('electron');
 const path = require('node:path');
@@ -13,20 +13,45 @@ const fs = require('node:fs');
 const isDev = !!process.env.ARCANA_DEV;
 const APP_ROOT = path.join(__dirname, '..');
 const SERVER_ENTRY = path.join(APP_ROOT, 'dist', 'server', 'index.js');
-const UI_EXPORT = path.join(APP_ROOT, 'out', 'index.html');
-const DEV_UI_URL = process.env.ARCANA_DEV_UI_URL ?? 'http://localhost:3000';
+const UI_PORT = process.env.LOCAL_NODE_UI_PORT ?? '3000';
 const SERVER_PORT = process.env.LOCAL_NODE_PORT ?? '4000';
+const UI_URL = process.env.ARCANA_DEV_UI_URL ?? `http://localhost:${UI_PORT}`;
 
 let mainWindow = null;
 let serverProcess = null;
+let uiProcess = null;
 
-function startServer() {
+function waitForPort(port, timeoutMs = 30000) {
+  const start = Date.now();
+  return new Promise((resolve, reject) => {
+    const tick = () => {
+      const sock = require('node:net').createConnection(port, '127.0.0.1');
+      sock
+        .on('connect', () => {
+          sock.end();
+          resolve();
+        })
+        .on('error', () => {
+          sock.destroy();
+          if (Date.now() - start > timeoutMs) reject(new Error(`port ${port} not open after ${timeoutMs}ms`));
+          else setTimeout(tick, 250);
+        });
+    };
+    tick();
+  });
+}
+
+async function startServer() {
   if (isDev) {
-    console.log('[main] dev mode — assuming server runs via `pnpm dev:server`');
+    console.log('[main] dev mode — assuming server + UI run via `pnpm dev`');
     return;
   }
   if (!fs.existsSync(SERVER_ENTRY)) {
-    console.error('[main] server build not found at', SERVER_ENTRY);
+    dialog.showErrorBox(
+      'Server build missing',
+      `Could not find the Fastify build at:\n${SERVER_ENTRY}\n\nPlease run \`pnpm --filter @arcana/local-node build\` first.`,
+    );
+    app.quit();
     return;
   }
   console.log('[main] starting Fastify server…');
@@ -40,6 +65,30 @@ function startServer() {
     console.log('[main] server exited with code', code);
     serverProcess = null;
   });
+
+  console.log('[main] starting Next.js UI…');
+  uiProcess = spawn(process.execPath, [path.join(APP_ROOT, 'node_modules', 'next', 'dist', 'bin', 'next'), 'start', '-p', UI_PORT], {
+    env: { ...process.env, NODE_ENV: 'production' },
+    cwd: APP_ROOT,
+    stdio: ['ignore', 'pipe', 'pipe'],
+  });
+  uiProcess.stdout?.on('data', (d) => process.stdout.write(`[ui] ${d}`));
+  uiProcess.stderr?.on('data', (d) => process.stderr.write(`[ui] ${d}`));
+  uiProcess.on('exit', (code) => {
+    console.log('[main] UI exited with code', code);
+    uiProcess = null;
+  });
+
+  // Wait for both ports to be open
+  try {
+    await Promise.all([
+      waitForPort(Number(SERVER_PORT)),
+      waitForPort(Number(UI_PORT)),
+    ]);
+    console.log('[main] both services ready');
+  } catch (err) {
+    console.error('[main] services did not become ready:', err);
+  }
 }
 
 function createWindow() {
@@ -58,30 +107,17 @@ function createWindow() {
     },
   });
 
-  // Open external links in the OS browser, not the Electron window
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
     shell.openExternal(url);
     return { action: 'deny' };
   });
 
-  if (isDev) {
-    mainWindow.loadURL(DEV_UI_URL);
-    mainWindow.webContents.openDevTools();
-  } else {
-    if (!fs.existsSync(UI_EXPORT)) {
-      dialog.showErrorBox(
-        'UI build missing',
-        `Could not find the static UI export at:\n${UI_EXPORT}\n\nPlease run \`pnpm --filter @arcana/local-node build\` before launching the installer.`,
-      );
-      app.quit();
-      return;
-    }
-    mainWindow.loadFile(UI_EXPORT);
-  }
+  mainWindow.loadURL(UI_URL);
+  if (isDev) mainWindow.webContents.openDevTools();
 }
 
-app.whenReady().then(() => {
-  startServer();
+app.whenReady().then(async () => {
+  await startServer();
   createWindow();
 
   app.on('activate', () => {
@@ -90,17 +126,16 @@ app.whenReady().then(() => {
 });
 
 app.on('window-all-closed', () => {
-  if (serverProcess) {
-    serverProcess.kill();
-  }
-  if (process.platform !== 'darwin') {
-    app.quit();
-  }
+  for (const p of [serverProcess, uiProcess]) p?.kill();
+  if (process.platform !== 'darwin') app.quit();
 });
 
 app.on('before-quit', () => {
-  if (serverProcess) {
-    serverProcess.kill();
-    serverProcess = null;
+  for (const p of [serverProcess, uiProcess]) {
+    if (p) {
+      p.kill();
+    }
   }
+  serverProcess = null;
+  uiProcess = null;
 });

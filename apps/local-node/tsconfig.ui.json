@@ -11,13 +11,15 @@
     "incremental": true,
     "plugins": [{ "name": "next" }],
     "paths": {
-      "@/*": ["./src/ui/*"],
+      "@/*": ["./*"],
       "@shared/*": ["./src/shared/*"]
     }
   },
   "include": [
     "next-env.d.ts",
-    "src/ui/**/*",
+    "app/**/*",
+    "components/**/*",
+    "lib/**/*",
     "src/shared/**/*",
     ".next/types/**/*.ts"
   ],

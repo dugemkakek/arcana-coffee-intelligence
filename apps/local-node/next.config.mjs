@@ -1,16 +1,27 @@
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  output: 'export', // static export so it can be served from file:// in Electron
+  // Note: not using `output: 'export'` because the roast detail page
+  // uses dynamic params that don't work with static export. Instead the
+  // Electron wrapper starts the Next.js server (via `next start`) on
+  // port 3000 in production, alongside the Fastify API on 4000.
   trailingSlash: true,
   reactStrictMode: true,
-  experimental: {
-    // Allow workspace packages to be bundled
-    externalDir: true,
-  },
-  // When the UI is loaded in Electron via file://, relative API URLs break.
-  // We rely on NEXT_PUBLIC_API_URL injected at build time.
   env: {
     NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000',
+  },
+  webpack: (config) => {
+    config.resolve = config.resolve ?? {};
+    config.resolve.alias = {
+      ...(config.resolve.alias ?? {}),
+      '@': __dirname,
+    };
+    return config;
   },
 };
 
