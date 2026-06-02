@@ -93,10 +93,41 @@ Per the user's explicit decision: defer these to later milestones.
 - **VPS backend** (`apps/vps-api/`) — comes in v0.2 with multi-tenant auth
 - **Supplier marketplace module** — see `CLAUDE-supplier-supplement.md`
 - **POS / e-commerce sync** — v0.3+
-- **Live Phidget capture** (direct USB reading) — v0.2
+- ~~**Live Phidget capture** (direct USB reading)~~ — ✅ **shipped in v0.2** (live UI at `/roasts/live`, simulator + PhidgetManager, WebSocket streaming)
 - **Kaffelogic `.klog` native import** — v1.5+ (closed format, no public spec)
-- **Live roast telemetry view** (real-time BT/ET/RoR graph) — v0.2
+- ~~**Live roast telemetry view** (real-time BT/ET/RoR graph)~~ — ✅ **shipped in v0.2** (real-time SVG chart in the live page)
 - **Inventory + production planning UI** — v0.3+
+
+## Live capture (v0.2)
+
+The user can capture a roast in real time instead of using Artisan + export.
+
+**Two interchangeable sources** (selected by `LIVE_SOURCE` env var, default `simulator`):
+
+- **`simulator`** — generates a realistic synthetic roast curve (light/medium/dark profiles) so the live UI can be developed + tested without a real Phidget plugged in.
+- **`phidget`** — wraps the `phidget22` npm package, discovers attached TMP1101 thermocouple modules, opens them on demand, emits `LiveSample` events at the configured data interval (default 1Hz). Requires the Phidget22 driver installed system-wide.
+
+**End-to-end flow:**
+1. User clicks 🔴 Live on the home page → `/roasts/live`
+2. Select device → connect
+3. Start session → server returns sessionId, LiveSessionStore starts buffering
+4. Fire events via WebSocket (charge, tp, dry_end, fc_start, fc_end, drop, etc.) — low latency
+5. Stop & save → server persists the buffered samples + events to Prisma with `source='live'`
+6. User navigates to `/roasts/[id]` to see the persisted roast and run AI analysis (same path as imported roasts)
+
+**Where the code lives:**
+- `apps/local-node/src/server/phidget/` — `TemperatureSource` interface, `RoastSimulator`, `PhidgetManager`
+- `apps/local-node/src/server/live/session.ts` — `LiveSessionStore` singleton (in-memory buffer)
+- `apps/local-node/src/server/index.ts` — REST endpoints (`/api/live/*`) + WebSocket `/ws/live`
+- `apps/local-node/app/roasts/live/page.tsx` — the UI page (real-time SVG chart + event buttons)
+
+**To use a real Phidget:**
+1. Install the Phidget22 driver from https://www.phidgets.com/docs/Operating_System_Support (Windows 7+ supported)
+2. Plug in a TMP1101 thermocouple module on a VINT Hub
+3. Set `LIVE_SOURCE=phidget` in `.env`
+4. The `GET /api/live/devices` endpoint will now list the discovered TMP1101
+
+**Known limitation (v0.2):** a single TMP1101 maps to BT only; ET is currently estimated as `BT + 15°C`. To get real ET, plug a second TMP1101 into the VINT Hub. Two-channel mapping is on the v0.3 roadmap.
 
 ## Indonesian coffee knowledge base
 
