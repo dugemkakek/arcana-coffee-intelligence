@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Live Phidget capture (v0.2 chunk 1)** — server-side Phidget module with two interchangeable `TemperatureSource` implementations:
+  - `RoastSimulator` — generates a realistic synthetic roast curve (light/medium/dark profiles) so the live UI can be developed and tested without a real Phidget plugged in. Default in dev.
+  - `PhidgetManager` — wraps the `phidget22` npm package, discovers attached TMP1101 thermocouple modules, opens them on demand, emits `LiveSample` events at the configured data interval (default 1Hz). Set `LIVE_SOURCE=phidget` to enable.
+- `apps/local-node/src/server/live/session.ts` — `LiveSessionStore` singleton: holds the active live roast in memory, buffers samples + events, persists to Prisma with `source='live'` on stop
+- `phidget22@^3.25.1` and `@fastify/websocket@^11.2.0` dependencies added to `@arcana/local-node`
+
+### Fixed
+- Removed unused private fields in `PhidgetManager` (strict TS caught them)
+
 ## [0.1.0] - 2026-06-02
 
 ### Added
