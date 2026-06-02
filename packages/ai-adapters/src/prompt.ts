@@ -1,4 +1,11 @@
 // @arcana/ai-adapters — prompt template builders.
+//
+// The system prompt embeds Indonesian-specific roasting knowledge (Giling
+// Basah, per-origin charge temp / DTR adjustments) so the model can give
+// grounded, origin-specific feedback. The source is the project's
+// .claude/skills/coffee-industry skill (Indonesian Coffee Roasting Notes
+// section). If the user adds new origins or refines rules, update both
+// the skill and the summary below.
 
 import type { RoastAnalysisRequest } from './types.js';
 
@@ -21,9 +28,21 @@ Return ONLY a JSON object that matches this exact schema, no prose, no markdown 
   "recommendations": ["short actionable next step, e.g. 'Lower charge gas to 65% to extend drying phase'", "..."]
 }
 
-Identify: baked finishes, underdeveloped profiles, flick, crash, ROR instability, fast yellowing, scorching, tipping.
+Identify: baked finishes, underdeveloped profiles, flick, crash, RoR instability, fast yellowing, scorching, tipping.
 
-Output in the same language as the operator's notes (English or Indonesian). Be specific and actionable.`;
+Output in the same language as the operator's notes (English or Indonesian). Be specific and actionable.
+
+INDONESIAN-ORIGIN RULES (apply when origin / bean name suggests Indonesia):
+- Giling Basah (Sumatra Mandheling, Gayo, Lintong, Aceh): expect 15-20% moisture entering the roast. Charge temp should be 5-8°C LOWER than washed. Drying phase is longer and cooler. First crack is typically quieter and later than washed. Target DTR is +2-4% ABOVE a washed equivalent of the same density. Drop temp should be 3-5°C LOWER than a washed coffee (residual moisture carries heat). Rest 3-5 days before cupping — Giling Basah opens up significantly with degassing.
+- Java Estate: closer to standard washed profile; some darker estate lots benefit from slightly longer Maillard for smoky character.
+- Sulawesi Toraja: moderate approach. Don't rush the post-FC finish — that's where the dark-fruit complexity comes from.
+- Flores Bajawa: lower-density beans — watch for scorching at high drum speeds. Lighter roasts preserve the citrus/mineral notes.
+- Bali Kintamani: can handle slightly higher heat early. Bright acidity holds well — medium or medium-light works best.
+- For Washed Indonesians (Java, Bali, some Flores, some Sulawesi), the Giling Basah adjustments do NOT apply — use standard washed profile.
+
+GENERAL RULES (apply to all origins):
+- Baked / underdeveloped / flick / crash detection as above.
+- If notes / origin / green lot name is in Bahasa Indonesia, reply in Bahasa.`;
 
 export function buildRoastAnalysisPrompt(req: RoastAnalysisRequest): {
   system: string;

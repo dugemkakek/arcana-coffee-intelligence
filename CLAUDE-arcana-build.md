@@ -98,6 +98,31 @@ Per the user's explicit decision: defer these to later milestones.
 - **Live roast telemetry view** (real-time BT/ET/RoR graph) — v0.2
 - **Inventory + production planning UI** — v0.3+
 
+## Indonesian coffee knowledge base
+
+The repo includes a custom LobeHub skill at `.claude/skills/coffee-industry/`
+(originally authored by the project owner at
+[`dugemkakek/coffee-industry-ai`](https://github.com/dugemkakek/coffee-industry-ai),
+reformatted from Hermes-agent format to LobeHub SKILL.md format with YAML
+frontmatter). It is **automatically loaded** when coffee-related keywords
+appear (kopi, espresso, roast, cupping, Giling Basah, DTR, RoR, Sumatra, etc.).
+
+The most directly used slice of the skill is the **Indonesian Coffee
+Roasting Notes** section, which is mirrored in the system prompt of
+`packages/ai-adapters/src/prompt.ts` so the LLM gives origin-specific
+(Gayo / Java / Toraja / Bajawa / Kintamani / Mandheling) advice even
+when the skill isn't loaded.
+
+Reference docs in the skill:
+- `SKILL.md` — main knowledge base (sourcing, roasting, cupping, ops, regulatory)
+- `references/BREWING_KNOWLEDGE.md` — extraction, brew methods, milk, defects
+- `references/SCHEMAS.md` — JSON schemas (cupping scores, supply chain, sourcing)
+- `references/CATALOG.md` — 18-SKU product reference
+- `references/QUICKREF.md` — human-readable cheat sheet
+- `references/EXAMPLE_PROMPTS.md` — realistic prompt templates
+- `references/AGENT_SOURCES.md` — research digest (capped at Feb 2026)
+- `CHANGELOG-coffee-industry.md` — upstream version history
+
 ## How to extend
 
 When you add a feature:
