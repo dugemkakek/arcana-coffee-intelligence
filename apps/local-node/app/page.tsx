@@ -14,9 +14,14 @@ export default function HomePage() {
     <div>
       <div className="flex items-center justify-between mb-6">
         <h2>Roasts</h2>
-        <Link href="/import" className="btn-primary">
-          + Import Roast
-        </Link>
+        <div className="flex gap-2">
+          <Link href="/roasts/live" className="btn-secondary">
+            🔴 Live
+          </Link>
+          <Link href="/import" className="btn-primary">
+            + Import Roast
+          </Link>
+        </div>
       </div>
 
       {isLoading && <p className="text-bean-600">Loading roasts…</p>}

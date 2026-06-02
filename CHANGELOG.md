@@ -8,7 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- **Live Phidget capture (v0.2 chunks 1-2)**
+- **Live Phidget capture (v0.2 — complete)**
   - Server-side Phidget module with two interchangeable `TemperatureSource` implementations:
     - `RoastSimulator` — realistic synthetic roast curve (light/medium/dark profiles). Default in dev. Set `LIVE_SOURCE=phidget` to opt out.
     - `PhidgetManager` — wraps the `phidget22` npm package, discovers attached TMP1101 thermocouple modules, opens them on demand, emits `LiveSample` events at the configured data interval (default 1Hz).
@@ -23,11 +23,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - `POST /api/live/sessions/stop` → `{roastId}` (persists to Prisma, can be analyzed like imported roasts)
   - WebSocket `/ws/live` — bidirectional: server pushes `sample` / `event` / `state` messages, client can send `event` or `ping` messages
   - Server-side broadcast throttle: max 10 Hz so the UI doesn't drown in samples
+- **Live UI page** `apps/local-node/app/roasts/live/page.tsx`:
+  - 3-step workflow: device → session → events
+  - Real-time SVG chart (lightweight inline SVG instead of Recharts so it renders instantly without a layout dance) with event markers
+  - Live KPI readout: elapsed, BT, ET, RoR (5s window), sample count
+  - Event button row (10 buttons: charge, tp, dry_end, fc_start, fc_end, sc_start, sc_end, drop, cool, note)
+  - "🔴 Live" button in the home page header
+  - On stop, navigates to the persisted roast's detail page (where AI analysis is also available)
+- `RoastSummary.machine` field added so the home + detail pages can show the roaster model
 - `phidget22@^3.25.1` and `@fastify/websocket@^11.2.0` dependencies added to `@arcana/local-node`
 
 ### Fixed
 - Removed unused private fields in `PhidgetManager` (strict TS caught them)
 - Used the correct `@fastify/websocket` v11 type import (`WebSocket` from the package's namespace export)
+- Added `machine` to the `/api/roasts` list and `/api/roasts/:id` responses (was missing, detail page was reading undefined)
 
 ## [0.1.0] - 2026-06-02
 

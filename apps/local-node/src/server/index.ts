@@ -160,6 +160,7 @@ async function main() {
       where: { id: req.params.id },
       include: {
         greenLot: { select: { id: true, name: true, code: true } },
+        machine: { select: { id: true, name: true, manufacturer: true, model: true } },
         events: { orderBy: { timestampMs: 'asc' } },
         samplePoints: { orderBy: { timestampMs: 'asc' } },
         aiAnalyses: { orderBy: { createdAt: 'desc' } },

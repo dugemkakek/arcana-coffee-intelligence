@@ -9,6 +9,7 @@ export interface RoastSummary {
   sourceFile: string | null;
   notes: string | null;
   greenLot: { id: string; name: string; code: string };
+  machine: { id: string; name: string; manufacturer: string | null; model: string | null } | null;
   aiAnalyses: Array<{
     id: string;
     createdAt: string;
