@@ -1,0 +1,156 @@
+// Central VPS Prisma schema
+// Multi-tenant SaaS backend and AI services
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model Tenant {
+  id        String   @id @default(uuid())
+  name      String
+  slug      String   @unique
+  country   String?
+  timezone  String?
+  plan      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  users      User[]
+  locations  Location[]
+  machines   Machine[]
+  aiConfigs  AiProviderConfig[]
+  aiUsage    AiUsageRecord[]
+  salesAggregates SalesAggregate[]
+  aiRoastAnalyses AiAnalysisRoastSummary[]
+  aiPlans    AiSuggestionPlan[]
+}
+
+model User {
+  id        String   @id @default(uuid())
+  tenant    Tenant   @relation(fields: [tenantId], references: [id])
+  tenantId  String
+  email     String   @unique
+  name      String
+  role      String
+  passwordHash String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Location {
+  id        String   @id @default(uuid())
+  tenant    Tenant   @relation(fields: [tenantId], references: [id])
+  tenantId  String
+  name      String
+  type      String
+  country   String?
+  city      String?
+  timezone  String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  machines  Machine[]
+}
+
+model Machine {
+  id        String   @id @default(uuid())
+  tenant    Tenant   @relation(fields: [tenantId], references: [id])
+  tenantId  String
+  location  Location @relation(fields: [locationId], references: [id])
+  locationId String
+  name      String
+  manufacturer String?
+  model     String?
+  batchCapacityKg Float?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model AiProviderConfig {
+  id        String   @id @default(uuid())
+  tenant    Tenant   @relation(fields: [tenantId], references: [id])
+  tenantId  String
+  provider  String   // minimax, openrouter, local
+  modelName String
+  apiKey    String?  // encrypted at app layer
+  maxTokensPerCall Int?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model AiUsageRecord {
+  id        String   @id @default(uuid())
+  tenant    Tenant   @relation(fields: [tenantId], references: [id])
+  tenantId  String
+  feature   String   // roast_analysis, production_plan, qa_chat
+  tokensPrompt Int
+  tokensCompletion Int
+  costEstimate Float?
+  createdAt DateTime @default(now())
+}
+
+model SalesAggregate {
+  id        String   @id @default(uuid())
+  tenant    Tenant   @relation(fields: [tenantId], references: [id])
+  tenantId  String
+  productId String   // remote product id from local node
+  date      DateTime
+  totalQuantitySold Float
+  totalRevenue      Float?
+  source    String
+}
+
+model AiAnalysisRoastSummary {
+  id        String   @id @default(uuid())
+  tenant    Tenant   @relation(fields: [tenantId], references: [id])
+  tenantId  String
+  roastSessionId String // remote roast session id from local node
+  provider  String
+  modelName String
+  analysisJson Json
+  summaryText String
+  createdAt DateTime @default(now())
+}
+
+model AiSuggestionPlan {
+  id        String   @id @default(uuid())
+  tenant    Tenant   @relation(fields: [tenantId], references: [id])
+  tenantId  String
+  dateRangeStart DateTime
+  dateRangeEnd   DateTime
+  inputSnapshotJson Json
+  suggestionJson    Json
+  summaryText String
+  createdAt DateTime @default(now())
+}
+
+model Subscription {
+  id        String   @id @default(uuid())
+  tenant    Tenant   @relation(fields: [tenantId], references: [id])
+  tenantId  String
+  status    String   // active, past_due, canceled
+  plan      String
+  startedAt DateTime
+  currentPeriodEnd DateTime
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Invoice {
+  id        String   @id @default(uuid())
+  tenant    Tenant   @relation(fields: [tenantId], references: [id])
+  tenantId  String
+  subscription Subscription? @relation(fields: [subscriptionId], references: [id])
+  subscriptionId String?
+  amount   Float
+  currency String
+  status   String   // paid, open, void, uncollectible
+  issuedAt DateTime
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}

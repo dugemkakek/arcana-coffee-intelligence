@@ -1,0 +1,40 @@
+{
+  "name": "@arcana/importers",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Parsers for third-party roast data files (Artisan JSON, Artisan CSV, …).",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./artisan-json": {
+      "types": "./dist/artisan-json.d.ts",
+      "default": "./dist/artisan-json.js"
+    },
+    "./artisan-csv": {
+      "types": "./dist/artisan-csv.d.ts",
+      "default": "./dist/artisan-csv.js"
+    }
+  },
+  "files": ["dist"],
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "lint": "echo 'no lint yet'",
+    "clean": "rimraf dist"
+  },
+  "dependencies": {
+    "@arcana/shared-types": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.0",
+    "rimraf": "^6.0.1",
+    "typescript": "^5.5.4",
+    "vitest": "^2.0.5"
+  }
+}

@@ -1,0 +1,41 @@
+# Auto-detect text files, normalize line endings to LF on commit
+* text=auto eol=lf
+
+# Explicitly declare binary files
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.pdf binary
+*.zip binary
+*.tar.gz binary
+*.7z binary
+*.exe binary
+*.dll binary
+*.so binary
+*.dylib binary
+*.db binary
+*.db-journal binary
+*.node binary
+
+# Shell scripts must use LF
+*.sh text eol=lf
+*.bash text eol=lf
+
+# Windows scripts must use CRLF
+*.bat text eol=crlf
+*.cmd text eol=crlf
+*.ps1 text eol=crlf
+
+# Documentation
+*.md text eol=lf
+*.mdx text eol=lf
+
+# Prisma schema
+*.prisma text eol=lf
+
+# Lockfiles
+pnpm-lock.yaml text eol=lf
+package-lock.json text eol=lf -diff
+yarn.lock text eol=lf -diff

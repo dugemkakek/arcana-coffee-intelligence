@@ -1,0 +1,365 @@
+// Local roastery node Prisma schema
+// This DB lives on the local LAN machine in each roastery.
+// v0.1: SQLite for zero-setup local development. Swap to PostgreSQL in v0.2+
+// by changing the datasource provider and DATABASE_URL_LOCAL.
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL_LOCAL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+// =====================================================================
+// Tenancy & access
+// =====================================================================
+
+model Tenant {
+  id        String   @id @default(uuid())
+  name      String
+  slug      String   @unique
+  country   String?
+  timezone  String?
+  plan      String   // free, ai_basic, ai_pro, etc.
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  users      User[]
+  locations  Location[]
+  machines   Machine[]
+  greenLots  GreenLot[]
+  products   Product[]
+}
+
+model User {
+  id           String   @id @default(uuid())
+  tenant       Tenant   @relation(fields: [tenantId], references: [id])
+  tenantId     String
+  email        String   @unique
+  name         String
+  role         String   // owner, admin, roaster, staff
+  passwordHash String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  roastSessions RoastSession[] @relation("RoastSessionOperator")
+}
+
+model Location {
+  id        String   @id @default(uuid())
+  tenant    Tenant   @relation(fields: [tenantId], references: [id])
+  tenantId  String
+  name      String
+  type      String   // roastery, warehouse, cafe, other
+  country   String?
+  city      String?
+  address   String?
+  timezone  String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  machines            Machine[]
+  roastedInventory    RoastedInventory[]
+  inventoryAdjustments InventoryAdjustment[]
+  roastSessions       RoastSession[]
+}
+
+model Machine {
+  id               String   @id @default(uuid())
+  tenant           Tenant   @relation(fields: [tenantId], references: [id])
+  tenantId         String
+  location         Location @relation(fields: [locationId], references: [id])
+  locationId       String
+  name             String
+  manufacturer     String?
+  model            String?
+  batchCapacityKg  Float?
+  dataLoggerType   String? // phidget, modbus, none
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  roastSessions RoastSession[]
+}
+
+// =====================================================================
+// Inventory: green coffee
+// =====================================================================
+
+model GreenLot {
+  id                  String   @id @default(uuid())
+  tenant              Tenant   @relation(fields: [tenantId], references: [id])
+  tenantId            String
+  code                String   @unique
+  name                String
+  originCountry       String?
+  region              String?
+  farm                String?
+  variety             String?
+  process             String?
+  screenSize          String?
+  moisture            Float?
+  density             Float?
+  harvestYear         Int?
+  supplierName        String?
+  contractQuantityKg  Float?
+  initialStockKg      Float
+  currentStockKg      Float
+  status              String   // active, finished, archived
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  movements       GreenMovement[]
+  roastSessions   RoastSession[]
+  productMappings ProductGreenMapping[]
+}
+
+model GreenMovement {
+  id             String   @id @default(uuid())
+  greenLot       GreenLot @relation(fields: [greenLotId], references: [id])
+  greenLotId     String
+  type           String   // inbound, adjustment, transfer
+  quantityKg     Float
+  fromLocationId String?
+  toLocationId   String?
+  reason         String?
+  createdAt      DateTime @default(now())
+}
+
+// =====================================================================
+// Inventory: roasted products
+// =====================================================================
+
+model Product {
+  id                 String   @id @default(uuid())
+  tenant             Tenant   @relation(fields: [tenantId], references: [id])
+  tenantId           String
+  code               String   @unique
+  name               String
+  description        String?
+  roastStyle         String? // light, medium, dark
+  defaultBatchSizeKg Float?
+  active             Boolean  @default(true)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  mappings             ProductGreenMapping[]
+  roastedInventory     RoastedInventory[]
+  inventoryAdjustments InventoryAdjustment[]
+  roastSessions        RoastSession[]
+  salesAggregates      SalesAggregate[]
+}
+
+model ProductGreenMapping {
+  id         String   @id @default(uuid())
+  product    Product  @relation(fields: [productId], references: [id])
+  productId  String
+  greenLot   GreenLot @relation(fields: [greenLotId], references: [id])
+  greenLotId String
+  percentage Float
+}
+
+model RoastedInventory {
+  id         String   @id @default(uuid())
+  tenant     Tenant   @relation(fields: [tenantId], references: [id])
+  tenantId   String
+  product    Product  @relation(fields: [productId], references: [id])
+  productId  String
+  location   Location @relation(fields: [locationId], references: [id])
+  locationId String
+  onHandKg   Float
+  updatedAt  DateTime @updatedAt
+}
+
+model InventoryAdjustment {
+  id         String   @id @default(uuid())
+  tenant     Tenant   @relation(fields: [tenantId], references: [id])
+  tenantId   String
+  product    Product  @relation(fields: [productId], references: [id])
+  productId  String
+  location   Location @relation(fields: [locationId], references: [id])
+  locationId String
+  deltaKg    Float
+  reason     String   // roast_batch, sale_sync, writeoff, manual_adjustment
+  refId      String?
+  createdAt  DateTime @default(now())
+}
+
+// =====================================================================
+// Roasting sessions & telemetry
+// =====================================================================
+
+model RoastSession {
+  id                  String    @id @default(uuid())
+  tenant              Tenant    @relation(fields: [tenantId], references: [id])
+  tenantId            String
+  machine             Machine   @relation(fields: [machineId], references: [id])
+  machineId           String
+  location            Location  @relation(fields: [locationId], references: [id])
+  locationId          String
+  product             Product?  @relation(fields: [productId], references: [id])
+  productId           String?
+  greenLot            GreenLot  @relation(fields: [greenLotId], references: [id])
+  greenLotId          String
+  targetBatchSizeKg   Float?
+  greenWeightKg       Float?
+  roastedWeightKg     Float?
+  chargeTime          DateTime?
+  dropTime            DateTime?
+  roastDate           DateTime
+  operator            User?     @relation("RoastSessionOperator", fields: [operatorUserId], references: [id])
+  operatorUserId      String?
+  referenceProfile    RoastProfile? @relation(fields: [referenceProfileId], references: [id])
+  referenceProfileId  String?
+  notes               String?
+  source              String    @default("imported") // imported, live, manual
+  sourceFile          String?   // original .json path, if imported
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  samplePoints RoastSamplePoint[]
+  events       RoastEvent[]
+  aiAnalyses   AiAnalysisRoast[]
+}
+
+model RoastSamplePoint {
+  id              String       @id @default(uuid())
+  roastSession    RoastSession @relation(fields: [roastSessionId], references: [id], onDelete: Cascade)
+  roastSessionId  String
+  timestampMs     Int
+  beanTempC       Float?
+  exhaustTempC    Float?
+  ror             Float?
+  gasSetting      Float?
+  airflowSetting  Float?
+}
+
+model RoastEvent {
+  id             String       @id @default(uuid())
+  roastSession   RoastSession @relation(fields: [roastSessionId], references: [id], onDelete: Cascade)
+  roastSessionId String
+  eventType      String       // charge, turning_point, first_crack_start, first_crack_end, drop, note
+  timestampMs    Int
+  value          String?
+}
+
+model RoastProfile {
+  id                    String   @id @default(uuid())
+  tenant                Tenant   @relation(fields: [tenantId], references: [id])
+  tenantId              String
+  product               Product? @relation(fields: [productId], references: [id])
+  productId             String?
+  name                  String
+  description           String?
+  sourceRoastSession    RoastSession @relation(fields: [sourceRoastSessionId], references: [id])
+  sourceRoastSessionId  String
+  isReference           Boolean  @default(true)
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  referencedBy RoastSession[]
+}
+
+// =====================================================================
+// POS & e-commerce sync
+// =====================================================================
+
+model ExternalSystem {
+  id           String   @id @default(uuid())
+  tenant       Tenant   @relation(fields: [tenantId], references: [id])
+  tenantId     String
+  type         String   // pos, ecommerce
+  providerName String
+  baseUrl      String?
+  apiKey       String?
+  configJson   String?  // stored as JSON text in SQLite
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  productMappings ExternalProductMapping[]
+  orders          ExternalOrder[]
+}
+
+model ExternalProductMapping {
+  id              String         @id @default(uuid())
+  tenant          Tenant         @relation(fields: [tenantId], references: [id])
+  tenantId        String
+  externalSystem  ExternalSystem @relation(fields: [externalSystemId], references: [id])
+  externalSystemId String
+  externalSku     String
+  product         Product        @relation(fields: [productId], references: [id])
+  productId       String
+}
+
+model ExternalOrder {
+  id               String   @id @default(uuid())
+  tenant           Tenant   @relation(fields: [tenantId], references: [id])
+  tenantId         String
+  externalSystem   ExternalSystem @relation(fields: [externalSystemId], references: [id])
+  externalSystemId String
+  externalOrderId  String
+  orderDate        DateTime
+  status           String
+  totalAmount      Float?
+  currency         String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  items ExternalOrderItem[]
+}
+
+model ExternalOrderItem {
+  id         String         @id @default(uuid())
+  order      ExternalOrder  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  orderId    String
+  externalSku String
+  product    Product?       @relation(fields: [productId], references: [id])
+  productId  String?
+  quantity   Float
+  unit       String?
+}
+
+model SalesAggregate {
+  id               String   @id @default(uuid())
+  tenant           Tenant   @relation(fields: [tenantId], references: [id])
+  tenantId         String
+  product          Product  @relation(fields: [productId], references: [id])
+  productId        String
+  date             DateTime
+  totalQuantitySold Float
+  totalRevenue     Float?
+  source           String   // pos, ecommerce, mixed
+}
+
+// =====================================================================
+// AI layer
+// =====================================================================
+
+model AiAnalysisRoast {
+  id             String       @id @default(uuid())
+  roastSession   RoastSession @relation(fields: [roastSessionId], references: [id], onDelete: Cascade)
+  roastSessionId String
+  tenant         Tenant       @relation(fields: [tenantId], references: [id])
+  tenantId       String
+  provider       String
+  modelName      String
+  // structured JSON, stored as text in SQLite
+  analysisJson   String
+  summaryText    String
+  tokensPrompt   Int?
+  tokensCompletion Int?
+  createdAt      DateTime     @default(now())
+}
+
+model AiSuggestionPlan {
+  id               String   @id @default(uuid())
+  tenant           Tenant   @relation(fields: [tenantId], references: [id])
+  tenantId         String
+  dateRangeStart   DateTime
+  dateRangeEnd     DateTime
+  inputSnapshotJson String
+  suggestionJson    String
+  summaryText      String
+  createdAt        DateTime @default(now())
+}

@@ -1,0 +1,37 @@
+{
+  "name": "@arcana/db-local",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Prisma schema + generated client for the local roastery node (SQLite in v0.1).",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": ["dist", "prisma"],
+  "scripts": {
+    "build": "prisma generate && tsc",
+    "dev": "prisma generate",
+    "typecheck": "tsc --noEmit",
+    "test": "echo 'no tests yet'",
+    "lint": "echo 'no lint yet'",
+    "prisma": "prisma",
+    "migrate": "prisma migrate dev",
+    "studio": "prisma studio",
+    "seed": "tsx src/seed.ts",
+    "clean": "rimraf dist"
+  },
+  "dependencies": {
+    "@prisma/client": "^5.18.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.0",
+    "prisma": "^5.18.0",
+    "rimraf": "^6.0.1",
+    "tsx": "^4.19.0",
+    "typescript": "^5.5.4"
+  }
+}

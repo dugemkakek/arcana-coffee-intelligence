@@ -1,0 +1,30 @@
+{
+  "name": "@arcana/ai-service",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Standalone AI normalization service for Arcana. Routes calls to MiniMax / Anthropic / OpenRouter.",
+  "type": "module",
+  "main": "./dist/server.js",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsx watch src/server.ts",
+    "start": "node dist/server.js",
+    "typecheck": "tsc --noEmit",
+    "test": "echo 'no tests yet'",
+    "lint": "echo 'no lint yet'",
+    "clean": "rimraf dist"
+  },
+  "dependencies": {
+    "@arcana/ai-adapters": "workspace:*",
+    "@arcana/shared-types": "workspace:*",
+    "fastify": "^5.0.0",
+    "pino-pretty": "^11.2.2",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.0",
+    "rimraf": "^6.0.1",
+    "tsx": "^4.19.0",
+    "typescript": "^5.5.4"
+  }
+}

@@ -1,0 +1,58 @@
+appId: com.arcana.local
+productName: Arcana Coffee Intelligence
+copyright: Copyright © 2026 Arcana contributors
+
+# Directories
+directories:
+  output: release
+  buildResources: electron/build
+
+# Build resources
+files:
+  - dist/**/*
+  - out/**/*
+  - public/**/*
+  - node_modules/**/*
+  - package.json
+  - "!node_modules/*/{CHANGELOG.md,README.md,readme.md,*.d.ts.map,*.map}"
+  - "!**/{__tests__,test,tests,powered-test,example,examples}"
+  - "!**/{.DS_Store,.git,.idea,.vscode,.nyc_output}"
+  - "!**/{.editorconfig,.eslintrc*,.prettierrc*,tsconfig*.json}"
+  - "!**/{.yarn,.yarnrc,.yarnrc.yml,.npmrc}"
+
+# Windows target — NSIS installer, both 32 and 64-bit.
+# NSIS is the most familiar installer for Indonesian roastery operators.
+win:
+  target:
+    - target: nsis
+      arch:
+        - x64
+        - ia32
+  # Don't require admin rights for the install (per-user)
+  requestedExecutionLevel: asInvoker
+  artifactName: ${productName}-Setup-${version}-${arch}.${ext}
+  # icon: electron/build/icon.ico  # add when we have one
+
+# NSIS installer options
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: Arcana Coffee Intelligence
+  uninstallDisplayName: Arcana Coffee Intelligence
+  deleteAppDataOnUninstall: true
+  # Indonesian + English welcome text
+  customLanguageFiles: []
+
+# Compression
+compression: normal
+
+# Skip auto-update in v0.1 — that's a v0.2+ feature
+publish: null
+
+# Misc
+asar: true
+extraMetadata:
+  main: electron/main.js

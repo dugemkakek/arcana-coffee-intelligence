@@ -1,0 +1,9 @@
+# Default owner for everything
+* @lucas
+
+# Database schema needs a second pair of eyes
+/packages/db-local/   @lucas
+
+# AI providers / prompts are sensitive
+/apps/ai-service/     @lucas
+/packages/ai-adapters/ @lucas

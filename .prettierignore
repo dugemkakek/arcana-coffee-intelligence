@@ -1,0 +1,11 @@
+node_modules
+.next
+dist
+build
+release
+coverage
+pnpm-lock.yaml
+*.min.js
+*.min.css
+CHANGELOG.md
+prisma/migrations

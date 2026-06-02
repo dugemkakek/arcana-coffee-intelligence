@@ -1,0 +1,36 @@
+{
+  "name": "arcana-coffee-intelligence",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Arcana Coffee Intelligence — a Cropster alternative for Indonesian micro-roasteries, with a free core and a paid AI layer.",
+  "license": "MIT",
+  "engines": {
+    "node": ">=20.0.0",
+    "pnpm": ">=9.0.0"
+  },
+  "packageManager": "pnpm@9.12.0",
+  "scripts": {
+    "dev": "pnpm -r --parallel --stream run dev",
+    "dev:local-node": "pnpm --filter @arcana/local-node dev",
+    "dev:ai-service": "pnpm --filter @arcana/ai-service dev",
+    "build": "pnpm -r run build",
+    "typecheck": "pnpm -r run typecheck",
+    "test": "pnpm -r run test",
+    "lint": "pnpm -r run lint",
+    "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md,yml,yaml}\"",
+    "format:check": "prettier --check \"**/*.{ts,tsx,js,jsx,json,md,yml,yaml}\"",
+    "prisma:migrate": "pnpm --filter @arcana/db-local prisma migrate dev",
+    "prisma:studio": "pnpm --filter @arcana/db-local prisma studio",
+    "prisma:generate": "pnpm --filter @arcana/db-local prisma generate",
+    "dist:win": "pnpm --filter @arcana/local-node dist:win",
+    "clean": "pnpm -r exec rm -rf node_modules dist .next .turbo",
+    "changelog": "conventional-changelog -p angular -i CHANGELOG.md -s -r 0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.0",
+    "conventional-changelog-cli": "^4.1.0",
+    "prettier": "^3.3.3",
+    "rimraf": "^6.0.1",
+    "typescript": "^5.5.4"
+  }
+}
