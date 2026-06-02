@@ -21,8 +21,14 @@ export interface LiveSample {
   t: number;
   /** Bean temperature, °C. */
   bt: number;
-  /** Exhaust temperature, °C. */
+  /** Exhaust temperature, °C. May be estimated (see `etEstimated`). */
   et: number;
+  /** True when ET is computed from BT (e.g. +15°C) rather than a real sensor. */
+  etEstimated?: boolean;
+  /** Which channel produced BT, for diagnostics. */
+  btChannel?: number;
+  /** Which channel produced ET (or 'estimated'). */
+  etChannel?: number | 'estimated';
 }
 
 export interface LiveDeviceInfo {

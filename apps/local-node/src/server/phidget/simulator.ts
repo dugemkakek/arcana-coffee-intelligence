@@ -185,7 +185,12 @@ export class RoastSimulator extends EventEmitter implements TemperatureSource {
     bt += btJitter;
     et += etJitter;
 
-    return { t, bt: round1(bt), et: round1(et) };
+    return {
+      t,
+      bt: round1(bt),
+      et: round1(et),
+      etEstimated: false, // simulator always generates both channels
+    };
   }
 }
 

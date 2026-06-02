@@ -25,6 +25,9 @@ interface LiveSample {
   t: number;
   bt: number;
   et: number;
+  etEstimated?: boolean;
+  btChannel?: number;
+  etChannel?: number | 'estimated';
 }
 
 type SourceState = 'disconnected' | 'connecting' | 'connected' | 'error';
@@ -218,6 +221,8 @@ export default function LivePage() {
   const isLive = sourceState === 'connected' && sessionId !== null;
   const roR = computeRoR(samples);
   const elapsedSec = lastSample?.t ?? 0;
+  // Did we ever see an estimated-ET sample? If so, show a banner.
+  const etEstimated = samples.some((s) => s.etEstimated);
 
   return (
     <div className="space-y-6">
@@ -238,6 +243,17 @@ export default function LivePage() {
       {error && (
         <div className="card border-roast-500 bg-roast-50">
           <p className="text-sm text-roast-700 font-medium">{error}</p>
+        </div>
+      )}
+
+      {etEstimated && isLive && (
+        <div className="card !p-3 border-roast-300 bg-roast-50 flex items-center gap-3">
+          <span className="text-roast-500 text-lg">⚠</span>
+          <div className="text-sm text-roast-800">
+            <strong>Exhaust temp is estimated</strong> as <code className="font-mono">BT + 15°C</code>.
+            To get real ET, plug a second TMP1101 into the VINT Hub — it will be
+            auto-discovered and used for the exhaust channel.
+          </div>
         </div>
       )}
 
