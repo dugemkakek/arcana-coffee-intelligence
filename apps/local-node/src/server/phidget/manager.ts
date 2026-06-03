@@ -1,264 +1,156 @@
-// @arcana/local-node — Phidget22 device manager (two-channel).
+// @arcana/local-node — Phidget 1048 (PhidgetTemperatureSensor 4-Input) via raw HID.
 //
-// Wraps the phidget22 npm package behind the same TemperatureSource
-// interface as the simulator. Discovers attached TMP1101 thermocouple
-// modules, opens them on demand, and emits LiveSample events at the
-// configured data interval (default 1000ms = 1Hz).
+// The phidget22 user-mode library's Manager pattern requires either the
+// Phidget22 kernel driver (Phidget22Service + phidget22.sys) or a
+// libusb-compatible driver bound to the device. On Windows hosts where
+// only the user-mode phidget22.dll is present and the device is bound to
+// the standard HIDClass driver, Manager.onAttach never fires and direct
+// TemperatureSensor.open() times out — even though the Phidget Control
+// Panel can still read the device via raw Win32 HID APIs.
 //
-// Two-channel behavior:
-//   - First TMP1101 found (or BT_DEVICE_SERIAL) → BT
-//   - Second TMP1101 found (or ET_DEVICE_SERIAL) → ET
-//   - If only one sensor is found, ET is estimated as BT + 15°C and
-//     the emitted sample has `etEstimated: true` so the UI can show
-//     a "ET estimated" banner
+// To get the device working in that environment we bypass phidget22
+// entirely and read HID input reports directly with `node-hid`.
 //
-// The Phidget22 library handles USB + VINT Hub transports transparently.
-// On Windows 7+ you need the Phidget22 driver installed. Without the
-// driver, this module will fail to attach and the UI will fall back to
-// the simulator.
+// HID input report format (hypothesis, byte 9 = status, 10 bytes total):
+//   [0]    : report id
+//   [1..2] : channel 0, int16 little-endian, value / 100 = °C
+//   [3..4] : channel 1
+//   [5..6] : channel 2
+//   [7..8] : channel 3
+//   [9]    : status
+//
+// Adjust BT_CHANNEL / ET_CHANNEL env vars if the roaster wires probes to
+// different physical channels on the 1048.
 
 import { EventEmitter } from 'node:events';
-import type { PhidgetNS } from './phidget-types.js';
-import type { LiveDeviceInfo, LiveSample, TemperatureSource } from './types.js';
+import type {
+  LiveDeviceInfo,
+  LiveSample,
+  TemperatureSource,
+} from './types.js';
 
-interface SensorHandle {
-  raw: any; // phidget22.TemperatureSensor
-  channel: 'bt' | 'et';
-  lastTempC: number;
-  lastUpdatedAt: number;
+const PHIDGET_VID = 0x06c2;
+const TEMP_SENSOR_4INPUT_PID = 0x0032; // Phidget 1048
+
+interface TempCelsius {
+  bt: number;
+  et: number;
+  etEstimated: boolean;
 }
 
 export class PhidgetManager extends EventEmitter implements TemperatureSource {
   readonly kind = 'phidget' as const;
-  private phidget: PhidgetNS | null = null;
-  private btSensor: SensorHandle | null = null;
-  private etSensor: SensorHandle | null = null;
+  private hid: any | null = null;
   private dataIntervalMs = 1000;
   private startTimeMs = 0;
   private attached = false;
-  /** Set of serials explicitly assigned (or auto-discovered) to BT/ET. */
-  private serialsAssigned: { bt?: number; et?: number } = {};
+  private btChannel = 0;
+  private etChannel = 1;
+  private lastBt = 0;
+  private lastEt = 0;
+
+  constructor() {
+    super();
+    const bt = Number(process.env.BT_CHANNEL ?? 0);
+    const et = Number(process.env.ET_CHANNEL ?? 1);
+    if (!Number.isNaN(bt) && bt >= 0 && bt <= 3) this.btChannel = bt;
+    if (!Number.isNaN(et) && et >= 0 && et <= 3) this.etChannel = et;
+  }
 
   // ---------- Device discovery ----------
 
   async listDevices(): Promise<LiveDeviceInfo[]> {
-    if (!this.phidget) {
-      this.phidget = await import('phidget22');
-    }
-    return new Promise((resolve, reject) => {
-      try {
-        const manager = new this.phidget!.Manager();
-        const devices: LiveDeviceInfo[] = [];
-        manager.onAttach = (phidget: any) => {
-          if (phidget.getClassName && phidget.getClassName() === 'TemperatureSensor') {
-            devices.push({
-              id: String(phidget.getDeviceSerialNumber()),
-              label: `TMP1101 #${phidget.getDeviceSerialNumber()} on hub port ${phidget.getHubPort() ?? '?'}`,
-              channels: phidget.getChannelCount ? phidget.getChannelCount() : 1,
-              isConnected: false,
-            });
-          }
-        };
-        manager.open();
-        setTimeout(() => {
-          try {
-            manager.close();
-          } catch {
-            // ignore
-          }
-          resolve(devices);
-        }, 1500);
-      } catch (err) {
-        reject(err as Error);
-      }
-    });
+    const hid = await import('node-hid');
+    const all: any[] = hid.devices();
+    return all
+      .filter((d) => d.vendorId === PHIDGET_VID && d.productId === TEMP_SENSOR_4INPUT_PID)
+      .map((d) => ({
+        id: String(d.serialNumber ?? d.path),
+        label: `PhidgetTemperatureSensor 4-Input #${d.serialNumber ?? '?'}`,
+        channels: 4,
+        isConnected: false,
+      }));
   }
 
-  // ---------- Two-channel connect ----------
+  // ---------- Two-channel connect (kept for back-compat) ----------
 
   /**
-   * Open a temperature source by deviceId. For backwards compat the
-   * single-arg form just opens BT on the given sensor. If you want to
-   * pick a specific BT and ET, use the env vars BT_DEVICE_SERIAL /
-   * ET_DEVICE_SERIAL or call connectBtEt(btSerial, etSerial).
+   * Open the first matching device. The `deviceId` is currently ignored
+   * — we only support the PN_1048 (4-input thermocouple) right now.
    */
   async connect(deviceId: string): Promise<void> {
-    const serial = Number(deviceId);
-    if (Number.isNaN(serial)) {
-      throw new Error(`PhidgetManager: invalid device id "${deviceId}" (must be a number)`);
-    }
-    await this.connectBtEt(serial, undefined);
+    void deviceId; // currently unused; PN_1048 is auto-selected
+    await this.connectFirst();
   }
 
   /**
-   * Open BT and optionally ET on specific TMP1101 serials.
-   * If `etSerial` is undefined, the manager will auto-discover a second
-   * TMP1101 on the same hub and use it for ET. If no second sensor is
-   * found, ET will be estimated.
+   * Open BT and ET on the first matching device. Per-channel serials
+   * don't apply to a 4-input board (it's one device, multiple channels),
+   * so we just open the device and read the configured channels.
    */
-  async connectBtEt(btSerial: number, etSerial: number | undefined): Promise<void> {
-    if (!this.phidget) {
-      this.phidget = await import('phidget22');
-    }
+  async connectBtEt(_btSerial: number | undefined, _etSerial: number | undefined): Promise<void> {
+    void _btSerial;
+    void _etSerial;
+    await this.connectFirst();
+  }
 
+  private async connectFirst(): Promise<void> {
     this.emit('state', 'connecting');
-
-    try {
-      this.btSensor = await this.openSensor(btSerial, 'bt');
-      this.serialsAssigned.bt = btSerial;
-    } catch (err) {
+    const hid = await import('node-hid');
+    const matches: any[] = hid
+      .devices()
+      .filter((d: any) => d.vendorId === PHIDGET_VID && d.productId === TEMP_SENSOR_4INPUT_PID);
+    if (matches.length === 0) {
+      const err = new Error('No PhidgetTemperatureSensor 4-Input (VID 06C2 / PID 0032) found on HID');
+      this.emit('error', err);
       this.emit('state', 'error');
-      throw new Error(`Failed to open BT sensor (serial=${btSerial}): ${(err as Error).message}`);
+      throw err;
     }
-
-    // If ET serial is explicitly given, use it. Otherwise auto-discover
-    // a different TMP1101 on the same hub.
-    let resolvedEtSerial = etSerial;
-    if (resolvedEtSerial == null) {
-      const discovered = await this.discoverEtSerial(btSerial);
-      resolvedEtSerial = discovered ?? undefined;
+    const path = matches[0].path as string;
+    try {
+      this.hid = new hid.HID(path);
+    } catch (e) {
+      const err = e as Error;
+      this.emit('error', new Error(`Failed to open HID device: ${err.message}`));
+      this.emit('state', 'error');
+      throw err;
     }
-
-    if (resolvedEtSerial != null) {
-      try {
-        this.etSensor = await this.openSensor(resolvedEtSerial, 'et');
-        this.serialsAssigned.et = resolvedEtSerial;
-      } catch (err) {
-        // ET is optional — log and continue with estimate
-        this.emit(
-          'error',
-          new Error(
-            `Failed to open ET sensor (serial=${resolvedEtSerial}): ${(err as Error).message}. ` +
-              'Falling back to BT-only mode with ET estimated.',
-          ),
-        );
-        this.etSensor = null;
-      }
-    }
+    this.hid.on('data', (buf: Buffer) => this.handleReport(buf));
+    this.hid.on('error', (e: Error) => {
+      this.emit('error', e);
+      this.emit('state', 'error');
+    });
 
     this.startTimeMs = Date.now();
     this.attached = true;
     this.emit('state', 'connected');
   }
 
-  // ---------- Internals ----------
-
-  private async openSensor(serial: number, channel: 'bt' | 'et'): Promise<SensorHandle> {
-    return new Promise((resolve, reject) => {
-      const TS = this.phidget!.TemperatureSensor;
-      const sensor = new TS();
-      const handle: SensorHandle = { raw: sensor, channel, lastTempC: 0, lastUpdatedAt: 0 };
-
-      sensor.onAttach = () => {
-        resolve(handle);
-      };
-      sensor.onError = (code: number, description: string) => {
-        this.emit('error', new Error(`${channel.toUpperCase()} sensor error ${code}: ${description}`));
-      };
-      sensor.onTemperatureChange = (temperature: number) => {
-        handle.lastTempC = temperature;
-        handle.lastUpdatedAt = Date.now();
-        this.maybeEmitSample();
-      };
-
-      sensor.setDeviceSerialNumber(serial);
-      sensor.setChannel(0);
-      sensor.setDataInterval(this.dataIntervalMs);
-      sensor.open().catch((err: Error) => {
-        reject(err);
-      });
-    });
-  }
-
-  /**
-   * Open a Manager briefly, listen for attaches, and return the first
-   * TMP1101 serial that is NOT the BT one. Returns undefined if no
-   * second sensor is found within 1500ms.
-   */
-  private async discoverEtSerial(btSerial: number): Promise<number | undefined> {
-    return new Promise((resolve) => {
-      try {
-        const manager = new this.phidget!.Manager();
-        let found: number | undefined;
-        const t = setTimeout(() => {
-          try {
-            manager.close();
-          } catch {
-            // ignore
-          }
-          resolve(found);
-        }, 1500);
-        manager.onAttach = (phidget: any) => {
-          if (phidget.getClassName && phidget.getClassName() === 'TemperatureSensor') {
-            const serial = phidget.getDeviceSerialNumber();
-            if (serial !== btSerial && found == null) {
-              found = serial;
-              clearTimeout(t);
-              try {
-                manager.close();
-              } catch {
-                // ignore
-              }
-              resolve(found);
-            }
-          }
-        };
-        manager.open();
-      } catch {
-        resolve(undefined);
-      }
-    });
-  }
-
-  /**
-   * Emit a combined LiveSample using the most recent reading from
-   * each sensor. Throttled implicitly by the fact that we only call
-   * this from the onTemperatureChange handlers.
-   *
-   * If only BT has reported, ET is estimated as BT + 15°C and the
-   * sample is marked with `etEstimated: true`.
-   */
-  private maybeEmitSample(): void {
-    if (!this.attached || !this.btSensor) return;
-    const t = Math.floor((Date.now() - this.startTimeMs) / 1000);
-    const bt = round1(this.btSensor.lastTempC);
-
-    let et: number;
-    let etEstimated: boolean;
-    if (this.etSensor && this.etSensor.lastTempC > 0) {
-      et = round1(this.etSensor.lastTempC);
-      etEstimated = false;
-    } else {
-      et = round1(this.btSensor.lastTempC + 15);
-      etEstimated = true;
-    }
-
-    const sample: LiveSample = {
-      t,
-      bt,
-      et,
-      etEstimated,
-      btChannel: this.serialsAssigned.bt,
-      etChannel: etEstimated ? 'estimated' : this.serialsAssigned.et,
-    };
-    this.emit('sample', sample);
+  private handleReport(buf: Buffer): void {
+    if (!this.attached) return;
+    if (buf.length < 9) return;
+    // 1 byte report id, then 4×int16 LE temperatures in 0.01°C units.
+    const ch0 = buf.readInt16LE(1) / 100;
+    const ch1 = buf.readInt16LE(3) / 100;
+    const ch2 = buf.readInt16LE(5) / 100;
+    const ch3 = buf.readInt16LE(7) / 100;
+    const channels = [ch0, ch1, ch2, ch3];
+    this.lastBt = channels[this.btChannel] ?? 0;
+    this.lastEt = channels[this.etChannel] ?? this.lastBt + 15;
+    this.maybeEmitSample();
   }
 
   // ---------- Lifecycle ----------
 
   async disconnect(): Promise<void> {
-    for (const s of [this.btSensor, this.etSensor]) {
-      if (s) {
-        try {
-          await s.raw.close();
-        } catch {
-          // ignore
-        }
+    if (this.hid) {
+      try {
+        this.hid.close();
+      } catch {
+        // ignore
       }
+      this.hid = null;
     }
-    this.btSensor = null;
-    this.etSensor = null;
-    this.serialsAssigned = {};
     this.attached = false;
     this.emit('state', 'disconnected');
   }
@@ -286,6 +178,25 @@ export class PhidgetManager extends EventEmitter implements TemperatureSource {
   onStateChange(handler: (state: 'disconnected' | 'connecting' | 'connected' | 'error') => void): () => void {
     this.on('state', handler);
     return () => this.off('state', handler);
+  }
+
+  // ---------- Internals ----------
+
+  private maybeEmitSample(): void {
+    if (!this.attached) return;
+    const t = Math.floor((Date.now() - this.startTimeMs) / 1000);
+    // If BT and ET are configured for the same physical channel, ET is
+    // the same as BT — don't claim it's "estimated".
+    const etEstimated = this.etChannel !== this.btChannel && this.lastEt === this.lastBt + 15;
+    const sample: LiveSample = {
+      t,
+      bt: round1(this.lastBt),
+      et: round1(this.lastEt),
+      etEstimated,
+      btChannel: this.btChannel,
+      etChannel: etEstimated ? 'estimated' : this.etChannel,
+    };
+    this.emit('sample', sample);
   }
 }
 

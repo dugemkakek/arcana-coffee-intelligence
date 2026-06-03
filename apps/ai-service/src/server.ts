@@ -6,10 +6,20 @@
 //
 // Reads AI_PROVIDER from env to select the adapter (minimax default).
 
+import { config as loadEnv } from 'dotenv';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import Fastify from 'fastify';
 import { z } from 'zod';
 import { createProvider, AIProviderError, type AIProvider, type RoastAnalysisRequest } from '@arcana/ai-adapters';
 import type { AIProviderName, HealthResponse } from '@arcana/shared-types';
+
+// Load .env from the repo root (3 levels up from src/).
+// dotenv does not override pre-set env vars, so production deployments
+// that inject real env vars are unaffected.
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+loadEnv({ path: resolve(__dirname, '../../../.env') });
 
 const PORT = Number(process.env.AI_SERVICE_PORT ?? 4001);
 const HOST = process.env.AI_SERVICE_HOST ?? '0.0.0.0';

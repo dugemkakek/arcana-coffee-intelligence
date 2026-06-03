@@ -23,12 +23,13 @@
 //   WS   /ws/live                  bi-directional: server pushes samples, client sends events
 //   GET  /samples/sample-roast.json (serves the bundled sample file)
 
+import './load-env.js';
 import Fastify from 'fastify';
 import cors from '@fastify/cors';
 import multipart from '@fastify/multipart';
 import fastifyStatic from '@fastify/static';
 import websocket from '@fastify/websocket';
-import { join, dirname } from 'node:path';
+import { join, dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { prisma } from '@arcana/db-local';
 import { parseArtisanJson, parseArtisanCsv } from '@arcana/importers';
