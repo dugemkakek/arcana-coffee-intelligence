@@ -132,11 +132,10 @@ The user can capture a roast in real time instead of using Artisan + export.
 ## Indonesian coffee knowledge base
 
 The repo includes a custom LobeHub skill at `.claude/skills/coffee-industry/`
-(originally authored by the project owner at
-[`dugemkakek/coffee-industry-ai`](https://github.com/dugemkakek/coffee-industry-ai),
-reformatted from Hermes-agent format to LobeHub SKILL.md format with YAML
-frontmatter). It is **automatically loaded** when coffee-related keywords
-appear (kopi, espresso, roast, cupping, Giling Basah, DTR, RoR, Sumatra, etc.).
+(originally authored by the Arcána team, reformatted from a Hermes-agent
+format to LobeHub SKILL.md format with YAML frontmatter). It is
+**automatically loaded** when coffee-related keywords appear (kopi,
+espresso, roast, cupping, Giling Basah, DTR, RoR, Sumatra, etc.).
 
 The most directly used slice of the skill is the **Indonesian Coffee
 Roasting Notes** section, which is mirrored in the system prompt of

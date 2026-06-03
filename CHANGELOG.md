@@ -41,7 +41,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **GitHub community files** — issue templates, PR template, CI workflow, SECURITY.md, CODEOWNERS
 - **Windows 7+ installer** via electron-builder + NSIS
 - **Research doc** `RESEARCH-roaster-data-formats.md` covering Artisan, Kaffelogic, and Phidget data formats
-- **Custom `coffee-industry` LobeHub skill** at `.claude/skills/coffee-industry/` — Indonesian coffee industry knowledge base (sourcing, roasting, cupping, ops, regulatory, BPOM/SNI/Halal, Giling Basah). Auto-loaded on coffee-related keywords. Reformat of `dugemkakek/coffee-industry-ai` from Hermes-agent format to LobeHub SKILL.md format.
+- **Custom `coffee-industry` LobeHub skill** at `.claude/skills/coffee-industry/` — Indonesian coffee industry knowledge base (sourcing, roasting, cupping, ops, regulatory, BPOM/SNI/Halal, Giling Basah). Auto-loaded on coffee-related keywords. Reformat of the team's `coffee-industry-ai` from Hermes-agent format to LobeHub SKILL.md format.
 
 ### Documentation
 - `README.md` with quick start, supported hardware, architecture overview

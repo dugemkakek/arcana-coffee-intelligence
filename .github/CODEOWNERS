@@ -1,9 +1,9 @@
 # Default owner for everything
-* @lucas
+* @arcana-team
 
 # Database schema needs a second pair of eyes
-/packages/db-local/   @lucas
+/packages/db-local/   @arcana-team
 
 # AI providers / prompts are sensitive
-/apps/ai-service/     @lucas
-/packages/ai-adapters/ @lucas
+/apps/ai-service/     @arcana-team
+/packages/ai-adapters/ @arcana-team
