@@ -84,4 +84,152 @@ export async function fetchHealth(): Promise<{ status: string; uptimeSec: number
   return jsonFetch('/api/health');
 }
 
+// =================================================================
+// v0.3: inventory + products + plan
+// =================================================================
+
+export interface GreenLot {
+  id: string;
+  code: string;
+  name: string;
+  originCountry: string | null;
+  region: string | null;
+  farm: string | null;
+  variety: string | null;
+  process: string | null;
+  initialStockKg: number;
+  currentStockKg: number;
+  status: string;
+  createdAt: string;
+  updatedAt: string;
+  movements?: Array<{ createdAt: string; type: string; quantityKg: number }>;
+}
+
+export interface GreenMovement {
+  id: string;
+  greenLotId: string;
+  type: 'inbound' | 'adjustment' | 'transfer';
+  quantityKg: number;
+  fromLocationId: string | null;
+  toLocationId: string | null;
+  reason: string | null;
+  createdAt: string;
+}
+
+export interface RoastedInventoryRow {
+  id: string;
+  productId: string;
+  locationId: string;
+  onHandKg: number;
+  updatedAt: string;
+  product: { id: string; code: string; name: string; roastStyle: string | null; active: boolean };
+  location: { id: string; name: string };
+}
+
+export interface Product {
+  id: string;
+  code: string;
+  name: string;
+  description: string | null;
+  roastStyle: string | null;
+  defaultBatchSizeKg: number | null;
+  active: boolean;
+}
+
+export interface PlanDigest {
+  lowStock: Array<{
+    inventoryId: string;
+    productId: string;
+    productName: string;
+    productCode: string;
+    roastStyle: string | null;
+    location: string;
+    onHandKg: number;
+    thresholdKg: number;
+  }>;
+  fifo: Array<{
+    greenLotId: string;
+    code: string;
+    name: string;
+    currentStockKg: number;
+    daysOld: number;
+  }>;
+  recentRoasts: Array<{
+    id: string;
+    roastDate: string;
+    source: string;
+    greenLot: { id: string; name: string; code: string };
+    machine: { id: string; name: string } | null;
+    greenWeightKg: number | null;
+    roastedWeightKg: number | null;
+  }>;
+  generatedAt: string;
+}
+
+export async function fetchGreenLots(): Promise<{ lots: GreenLot[] }> {
+  return jsonFetch('/api/inventory/green');
+}
+
+export async function fetchGreenMovements(lotId: string): Promise<{ movements: GreenMovement[] }> {
+  return jsonFetch(`/api/inventory/green/${lotId}/movements`);
+}
+
+export async function addGreenLot(body: {
+  code: string;
+  name: string;
+  originCountry?: string;
+  region?: string;
+  farm?: string;
+  variety?: string;
+  process?: string;
+  initialStockKg: number;
+}): Promise<GreenLot> {
+  return jsonFetch('/api/inventory/green', { method: 'POST', body: JSON.stringify(body) });
+}
+
+export async function addGreenMovement(
+  lotId: string,
+  body: {
+    type: 'inbound' | 'adjustment' | 'transfer';
+    quantityKg: number;
+    fromLocationId?: string;
+    toLocationId?: string;
+    reason?: string;
+  },
+): Promise<{ movement: GreenMovement; lot: GreenLot }> {
+  return jsonFetch(`/api/inventory/green/${lotId}/movement`, { method: 'POST', body: JSON.stringify(body) });
+}
+
+export async function fetchRoastedInventory(): Promise<{ items: RoastedInventoryRow[] }> {
+  return jsonFetch('/api/inventory/roasted');
+}
+
+export async function adjustRoasted(body: {
+  productId: string;
+  locationId: string;
+  deltaKg: number;
+  reason: 'roast_batch' | 'sale_sync' | 'writeoff' | 'manual_adjustment';
+  refId?: string;
+}): Promise<{ adjustment: { id: string }; inventory: RoastedInventoryRow }> {
+  return jsonFetch('/api/inventory/roasted/adjustment', { method: 'POST', body: JSON.stringify(body) });
+}
+
+export async function fetchProducts(): Promise<{ products: Product[] }> {
+  return jsonFetch('/api/products');
+}
+
+export async function addProduct(body: {
+  code: string;
+  name: string;
+  description?: string;
+  roastStyle?: 'light' | 'medium' | 'dark';
+  defaultBatchSizeKg?: number;
+}): Promise<Product> {
+  return jsonFetch('/api/products', { method: 'POST', body: JSON.stringify(body) });
+}
+
+export async function fetchPlan(): Promise<PlanDigest> {
+  return jsonFetch('/api/plan');
+}
+
 export { API_URL };

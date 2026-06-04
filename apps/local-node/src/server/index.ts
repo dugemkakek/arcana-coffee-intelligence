@@ -22,6 +22,16 @@
 //   POST /api/live/sessions/stop                                 -> {roastId}
 //   WS   /ws/live                  bi-directional: server pushes samples, client sends events
 //   GET  /samples/sample-roast.json (serves the bundled sample file)
+//   --- inventory + products + plan (v0.3) ---
+//   GET  /api/inventory/green
+//   GET  /api/inventory/green/:id/movements
+//   POST /api/inventory/green                          {code,name,originCountry?,region?,farm?,variety?,process?,initialStockKg}
+//   POST /api/inventory/green/:id/movement             {type:'inbound'|'adjustment'|'transfer', quantityKg, fromLocationId?, toLocationId?, reason?}
+//   GET  /api/inventory/roasted
+//   POST /api/inventory/roasted/adjustment             {productId,locationId,deltaKg,reason,refId?}
+//   GET  /api/products
+//   POST /api/products                                 {code,name,description?,roastStyle?,defaultBatchSizeKg?}
+//   GET  /api/plan
 
 import './load-env.js';
 import Fastify from 'fastify';
@@ -544,6 +554,375 @@ async function main() {
       return { roastId };
     } catch (err) {
       return reply.code(500).send({ error: `Stop failed: ${(err as Error).message}`, code: 'STOP_FAILED' });
+    }
+  });
+
+  // ----------------------------------------------------------
+  // Inventory + products + plan (v0.3)
+  // ----------------------------------------------------------
+
+  /** Resolve the seeded `demo-roastery` tenant. Throws 500 if missing. */
+  async function getDemoTenant() {
+    const tenant = await prisma.tenant.findUnique({ where: { slug: 'demo-roastery' } });
+    if (!tenant) {
+      throw Object.assign(new Error('Demo tenant not found. Run `pnpm --filter @arcana/db-local seed` first.'), {
+        statusCode: 500,
+        code: 'NO_TENANT',
+      });
+    }
+    return tenant;
+  }
+
+  // -- Green inventory ---------------------------------------
+
+  app.get('/api/inventory/green', async (_req, reply) => {
+    try {
+      const tenant = await getDemoTenant();
+      const lots = await prisma.greenLot.findMany({
+        where: { tenantId: tenant.id },
+        orderBy: { createdAt: 'desc' },
+        include: {
+          movements: { orderBy: { createdAt: 'desc' }, take: 1, select: { createdAt: true, type: true, quantityKg: true } },
+        },
+      });
+      return { lots };
+    } catch (err) {
+      const e = err as Error & { statusCode?: number; code?: string };
+      return reply.code(e.statusCode ?? 500).send({ error: e.message, code: e.code ?? 'INTERNAL' });
+    }
+  });
+
+  app.get<{ Params: { id: string } }>('/api/inventory/green/:id/movements', async (req, reply) => {
+    try {
+      const movements = await prisma.greenMovement.findMany({
+        where: { greenLotId: req.params.id },
+        orderBy: { createdAt: 'desc' },
+      });
+      return { movements };
+    } catch (err) {
+      return reply.code(500).send({ error: (err as Error).message, code: 'INTERNAL' });
+    }
+  });
+
+  app.post<{
+    Body: {
+      code: string;
+      name: string;
+      originCountry?: string;
+      region?: string;
+      farm?: string;
+      variety?: string;
+      process?: string;
+      initialStockKg: number;
+    };
+  }>('/api/inventory/green', async (req, reply) => {
+    try {
+      const tenant = await getDemoTenant();
+      const b = req.body;
+      if (!b?.code || !b?.name || typeof b.initialStockKg !== 'number' || b.initialStockKg < 0) {
+        return reply.code(400).send({
+          error: 'code, name, and initialStockKg (>=0) are required',
+          code: 'INVALID_INPUT',
+        });
+      }
+      const created = await prisma.$transaction(async (tx) => {
+        const lot = await tx.greenLot.create({
+          data: {
+            tenantId: tenant.id,
+            code: b.code,
+            name: b.name,
+            originCountry: b.originCountry ?? null,
+            region: b.region ?? null,
+            farm: b.farm ?? null,
+            variety: b.variety ?? null,
+            process: b.process ?? null,
+            initialStockKg: b.initialStockKg,
+            currentStockKg: b.initialStockKg,
+            status: 'active',
+          },
+        });
+        if (b.initialStockKg > 0) {
+          await tx.greenMovement.create({
+            data: {
+              greenLotId: lot.id,
+              type: 'inbound',
+              quantityKg: b.initialStockKg,
+              reason: 'opening_balance',
+            },
+          });
+        }
+        return lot;
+      });
+      return reply.code(201).send(created);
+    } catch (err) {
+      const e = err as Error & { code?: string };
+      if (e.code === 'P2002') {
+        return reply.code(409).send({ error: 'A green lot with that code already exists', code: 'CODE_TAKEN' });
+      }
+      return reply.code(500).send({ error: e.message, code: 'INTERNAL' });
+    }
+  });
+
+  app.post<{
+    Params: { id: string };
+    Body: {
+      type: 'inbound' | 'adjustment' | 'transfer';
+      quantityKg: number;
+      fromLocationId?: string;
+      toLocationId?: string;
+      reason?: string;
+    };
+  }>('/api/inventory/green/:id/movement', async (req, reply) => {
+    try {
+      const b = req.body;
+      if (!b?.type || !['inbound', 'adjustment', 'transfer'].includes(b.type)) {
+        return reply.code(400).send({ error: 'type must be inbound|adjustment|transfer', code: 'INVALID_TYPE' });
+      }
+      if (typeof b.quantityKg !== 'number' || !Number.isFinite(b.quantityKg)) {
+        return reply.code(400).send({ error: 'quantityKg must be a number', code: 'INVALID_QTY' });
+      }
+      const result = await prisma.$transaction(async (tx) => {
+        const lot = await tx.greenLot.findUnique({ where: { id: req.params.id } });
+        if (!lot) throw Object.assign(new Error('Green lot not found'), { statusCode: 404, code: 'NOT_FOUND' });
+        const movement = await tx.greenMovement.create({
+          data: {
+            greenLotId: lot.id,
+            type: b.type,
+            quantityKg: b.quantityKg,
+            fromLocationId: b.fromLocationId ?? null,
+            toLocationId: b.toLocationId ?? null,
+            reason: b.reason ?? null,
+          },
+        });
+        // Movement sign convention:
+        //   inbound  → +qty (received more)
+        //   transfer → +qty in, −qty out (we only model one side; caller passes the signed delta)
+        //   adjustment → signed delta (can be negative for write-off, positive for correction)
+        const delta = b.type === 'inbound' ? Math.abs(b.quantityKg) : b.quantityKg;
+        const newStock = Math.max(0, lot.currentStockKg + delta);
+        const updated = await tx.greenLot.update({
+          where: { id: lot.id },
+          data: {
+            currentStockKg: newStock,
+            status: newStock === 0 && lot.status === 'active' ? 'finished' : lot.status,
+          },
+        });
+        return { movement, lot: updated };
+      });
+      return reply.send(result);
+    } catch (err) {
+      const e = err as Error & { statusCode?: number; code?: string };
+      return reply.code(e.statusCode ?? 500).send({ error: e.message, code: e.code ?? 'INTERNAL' });
+    }
+  });
+
+  // -- Roasted inventory -------------------------------------
+
+  app.get('/api/inventory/roasted', async (_req, reply) => {
+    try {
+      const tenant = await getDemoTenant();
+      const rows = await prisma.roastedInventory.findMany({
+        where: { tenantId: tenant.id },
+        orderBy: { updatedAt: 'desc' },
+        include: {
+          product: { select: { id: true, code: true, name: true, roastStyle: true, active: true } },
+          location: { select: { id: true, name: true } },
+        },
+      });
+      return { items: rows };
+    } catch (err) {
+      const e = err as Error & { statusCode?: number; code?: string };
+      return reply.code(e.statusCode ?? 500).send({ error: e.message, code: e.code ?? 'INTERNAL' });
+    }
+  });
+
+  app.post<{
+    Body: {
+      productId: string;
+      locationId: string;
+      deltaKg: number;
+      reason: 'roast_batch' | 'sale_sync' | 'writeoff' | 'manual_adjustment';
+      refId?: string;
+    };
+  }>('/api/inventory/roasted/adjustment', async (req, reply) => {
+    try {
+      const b = req.body;
+      if (!b?.productId || !b?.locationId) {
+        return reply.code(400).send({ error: 'productId and locationId are required', code: 'INVALID_INPUT' });
+      }
+      if (typeof b.deltaKg !== 'number' || !Number.isFinite(b.deltaKg)) {
+        return reply.code(400).send({ error: 'deltaKg must be a number', code: 'INVALID_DELTA' });
+      }
+      const validReasons = ['roast_batch', 'sale_sync', 'writeoff', 'manual_adjustment'];
+      if (!b.reason || !validReasons.includes(b.reason)) {
+        return reply.code(400).send({ error: `reason must be one of: ${validReasons.join(', ')}`, code: 'INVALID_REASON' });
+      }
+
+      const result = await prisma.$transaction(async (tx) => {
+        const tenant = await tx.tenant.findUnique({ where: { slug: 'demo-roastery' } });
+        if (!tenant) throw Object.assign(new Error('Demo tenant not found'), { statusCode: 500, code: 'NO_TENANT' });
+
+        const adj = await tx.inventoryAdjustment.create({
+          data: {
+            tenantId: tenant.id,
+            productId: b.productId,
+            locationId: b.locationId,
+            deltaKg: b.deltaKg,
+            reason: b.reason,
+            refId: b.refId ?? null,
+          },
+        });
+
+        // Upsert on (productId, locationId) — schema allows duplicates, but for
+        // the on-hand total we maintain a single row per pair in v0.3.
+        const existing = await tx.roastedInventory.findFirst({
+          where: { productId: b.productId, locationId: b.locationId, tenantId: tenant.id },
+        });
+        const newOnHand = Math.max(0, (existing?.onHandKg ?? 0) + b.deltaKg);
+        const inventory = existing
+          ? await tx.roastedInventory.update({
+              where: { id: existing.id },
+              data: { onHandKg: newOnHand },
+            })
+          : await tx.roastedInventory.create({
+              data: {
+                tenantId: tenant.id,
+                productId: b.productId,
+                locationId: b.locationId,
+                onHandKg: newOnHand,
+              },
+            });
+
+        return { adjustment: adj, inventory };
+      });
+      return reply.code(201).send(result);
+    } catch (err) {
+      const e = err as Error & { statusCode?: number; code?: string };
+      return reply.code(e.statusCode ?? 500).send({ error: e.message, code: e.code ?? 'INTERNAL' });
+    }
+  });
+
+  // -- Products -----------------------------------------------
+
+  app.get('/api/products', async (_req, reply) => {
+    try {
+      const tenant = await getDemoTenant();
+      const products = await prisma.product.findMany({
+        where: { tenantId: tenant.id },
+        orderBy: { name: 'asc' },
+      });
+      return { products };
+    } catch (err) {
+      const e = err as Error & { statusCode?: number; code?: string };
+      return reply.code(e.statusCode ?? 500).send({ error: e.message, code: e.code ?? 'INTERNAL' });
+    }
+  });
+
+  app.post<{
+    Body: {
+      code: string;
+      name: string;
+      description?: string;
+      roastStyle?: 'light' | 'medium' | 'dark';
+      defaultBatchSizeKg?: number;
+    };
+  }>('/api/products', async (req, reply) => {
+    try {
+      const tenant = await getDemoTenant();
+      const b = req.body;
+      if (!b?.code || !b?.name) {
+        return reply.code(400).send({ error: 'code and name are required', code: 'INVALID_INPUT' });
+      }
+      const validStyles = ['light', 'medium', 'dark'];
+      if (b.roastStyle && !validStyles.includes(b.roastStyle)) {
+        return reply.code(400).send({ error: `roastStyle must be one of: ${validStyles.join(', ')}`, code: 'INVALID_STYLE' });
+      }
+      const created = await prisma.product.create({
+        data: {
+          tenantId: tenant.id,
+          code: b.code,
+          name: b.name,
+          description: b.description ?? null,
+          roastStyle: b.roastStyle ?? null,
+          defaultBatchSizeKg: b.defaultBatchSizeKg ?? null,
+          active: true,
+        },
+      });
+      return reply.code(201).send(created);
+    } catch (err) {
+      const e = err as Error & { code?: string };
+      if (e.code === 'P2002') {
+        return reply.code(409).send({ error: 'A product with that code already exists', code: 'CODE_TAKEN' });
+      }
+      return reply.code(500).send({ error: e.message, code: 'INTERNAL' });
+    }
+  });
+
+  // -- Plan digest --------------------------------------------
+
+  app.get('/api/plan', async (_req, reply) => {
+    try {
+      const tenant = await getDemoTenant();
+      const LOW_STOCK_KG = 1.0;
+      const FIFO_LIMIT = 5;
+      const RECENT_LIMIT = 5;
+
+      const [lowStockRows, fifoRows, recentRows] = await Promise.all([
+        prisma.roastedInventory.findMany({
+          where: { tenantId: tenant.id, onHandKg: { lt: LOW_STOCK_KG } },
+          orderBy: { onHandKg: 'asc' },
+          include: { product: { select: { id: true, name: true, code: true, roastStyle: true } }, location: { select: { name: true } } },
+        }),
+        prisma.greenLot.findMany({
+          where: { tenantId: tenant.id, status: 'active' },
+          orderBy: { createdAt: 'asc' }, // oldest first → FIFO
+          take: FIFO_LIMIT,
+          select: { id: true, code: true, name: true, currentStockKg: true, createdAt: true },
+        }),
+        prisma.roastSession.findMany({
+          where: { tenantId: tenant.id },
+          orderBy: { roastDate: 'desc' },
+          take: RECENT_LIMIT,
+          include: {
+            greenLot: { select: { id: true, name: true, code: true } },
+            machine: { select: { id: true, name: true } },
+          },
+        }),
+      ]);
+
+      const now = Date.now();
+      return {
+        lowStock: lowStockRows.map((r) => ({
+          inventoryId: r.id,
+          productId: r.product.id,
+          productName: r.product.name,
+          productCode: r.product.code,
+          roastStyle: r.product.roastStyle,
+          location: r.location.name,
+          onHandKg: r.onHandKg,
+          thresholdKg: LOW_STOCK_KG,
+        })),
+        fifo: fifoRows.map((g) => ({
+          greenLotId: g.id,
+          code: g.code,
+          name: g.name,
+          currentStockKg: g.currentStockKg,
+          daysOld: Math.max(0, Math.floor((now - new Date(g.createdAt).getTime()) / 86_400_000)),
+        })),
+        recentRoasts: recentRows.map((r) => ({
+          id: r.id,
+          roastDate: r.roastDate,
+          source: r.source,
+          greenLot: r.greenLot,
+          machine: r.machine,
+          greenWeightKg: r.greenWeightKg,
+          roastedWeightKg: r.roastedWeightKg,
+        })),
+        generatedAt: new Date().toISOString(),
+      };
+    } catch (err) {
+      const e = err as Error & { statusCode?: number; code?: string };
+      return reply.code(e.statusCode ?? 500).send({ error: e.message, code: e.code ?? 'INTERNAL' });
     }
   });
 
