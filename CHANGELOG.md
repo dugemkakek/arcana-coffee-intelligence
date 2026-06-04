@@ -8,6 +8,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Sidebar + Inventory + Plan pages (v0.3.x)**
+  - Replaced the top-nav with a left sidebar (`components/AppShell.tsx`). Four tabs: Live, Roasts, Inventory, Plan. Active tab computed via `usePathname()`. Mobile (<lg) collapses to a horizontal scrollable top strip.
+  - **Inventory page** (`/inventory`) — two-tab view (Green / Roasted). Green tab: list of `GreenLot` rows with a current-vs-initial stock progress bar; inline "Add lot" form (code, name, origin, region, farm, variety, process, initial kg). Roasted tab: list of `RoastedInventory` rows by product+location; inline "Add product" form + "Manual adjustment" form (delta kg, reason select, optional ref).
+  - **Plan page** (`/plan`) — server-rendered digest in three cards: Stock alerts (`onHandKg < 1.0`), Roast next (FIFO of oldest 5 active green lots), Recent roasts (last 5). No JS required to view.
+  - 8 new REST endpoints on the local-node API: `GET/POST /api/inventory/green`, `GET/POST /api/inventory/green/:id/movement`, `GET /api/inventory/roasted`, `POST /api/inventory/roasted/adjustment`, `GET/POST /api/products`, `GET /api/plan`. All scoped to the seeded `demo-roastery` tenant. Stock-changing writes wrap in a Prisma transaction with the matching audit row (`GreenMovement` or `InventoryAdjustment`).
+  - `lib/api.ts` extended with typed clients for the new endpoints.
+  - New client components: `AddGreenLotForm`, `AddProductForm`, `AdjustRoastedForm`. All use React Query mutations and invalidate the relevant query keys on success.
+  - `package.json` bumps to v0.3.0 in the sidebar footer.
 - **Two-channel BT/ET Phidget mapping (v0.2.x)**
   - `PhidgetManager` refactored to open two TMP1101 sensors (one for BT, one for ET) on the same VINT Hub instead of guessing ET as `BT + 15°C`
   - Auto-discovery: if `BT_DEVICE_SERIAL` / `ET_DEVICE_SERIAL` are unset, the first / second TMP1101 found on the hub are used
