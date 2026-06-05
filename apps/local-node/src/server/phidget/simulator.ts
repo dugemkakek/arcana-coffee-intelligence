@@ -140,18 +140,22 @@ export class RoastSimulator extends EventEmitter implements TemperatureSource {
     ];
 
     let bt: number;
-    if (t <= anchors[0][0]) bt = anchors[0][1];
-    else if (t >= anchors[anchors.length - 1][0]) bt = anchors[anchors.length - 1][1];
+    const firstA = anchors[0]!;
+    const lastA = anchors[anchors.length - 1]!;
+    if (t <= firstA[0]) bt = firstA[1];
+    else if (t >= lastA[0]) bt = lastA[1];
     else {
       // find bracketing pair
       for (let i = 0; i < anchors.length - 1; i++) {
-        if (t >= anchors[i][0] && t <= anchors[i + 1][0]) {
-          const f = (t - anchors[i][0]) / (anchors[i + 1][0] - anchors[i][0]);
-          bt = anchors[i][1] + f * (anchors[i + 1][1] - anchors[i][1]);
+        const a = anchors[i]!;
+        const b = anchors[i + 1]!;
+        if (t >= a[0] && t <= b[0]) {
+          const f = (t - a[0]) / (b[0] - a[0]);
+          bt = a[1] + f * (b[1] - a[1]);
           break;
         }
       }
-      bt = anchors[anchors.length - 1][1];
+      bt = lastA[1];
     }
 
     // ET curve: generally 10-15°C above BT, with a sharper initial drop
@@ -165,17 +169,21 @@ export class RoastSimulator extends EventEmitter implements TemperatureSource {
       [p.dropT + 30, p.dropBT - 15],
     ];
     let et: number;
-    if (t <= etAnchors[0][0]) et = etAnchors[0][1];
-    else if (t >= etAnchors[etAnchors.length - 1][0]) et = etAnchors[etAnchors.length - 1][1];
+    const first = etAnchors[0];
+    const last = etAnchors[etAnchors.length - 1];
+    if (t <= first![0]) et = first![1];
+    else if (t >= last![0]) et = last![1];
     else {
       for (let i = 0; i < etAnchors.length - 1; i++) {
-        if (t >= etAnchors[i][0] && t <= etAnchors[i + 1][0]) {
-          const f = (t - etAnchors[i][0]) / (etAnchors[i + 1][0] - etAnchors[i][0]);
-          et = etAnchors[i][1] + f * (etAnchors[i + 1][1] - etAnchors[i][1]);
+        const a = etAnchors[i]!;
+        const b = etAnchors[i + 1]!;
+        if (t >= a[0] && t <= b[0]) {
+          const f = (t - a[0]) / (b[0] - a[0]);
+          et = a[1] + f * (b[1] - a[1]);
           break;
         }
       }
-      et = etAnchors[etAnchors.length - 1][1];
+      et = last![1];
     }
 
     // Add small noise so the chart looks real

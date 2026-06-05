@@ -198,9 +198,9 @@ export function profileToImport(
     const idx = special[i];
     const typeNum = specialType[i];
     if (typeof idx !== 'number' || idx < 0 || idx >= timex.length) continue;
-    const type = ARTISAN_EVENT_TYPE[typeNum] ?? 'note';
-    const value = specialVal[i] != null ? String(specialVal[i]) : undefined;
-    events.push({ type, t: timex[idx], value });
+    const type = ARTISAN_EVENT_TYPE[typeNum!] ?? 'note';
+    const value = specialVal[i] != null ? String(specialVal[i]!) : undefined;
+    events.push({ type, t: timex[idx]!, value });
   }
   events.sort((a, b) => a.t - b.t);
 
@@ -224,7 +224,7 @@ export function profileToImport(
     typeof profile.totaltime === 'number'
       ? profile.totaltime
       : samples.length > 0
-        ? samples[samples.length - 1].t - samples[0].t
+        ? samples[samples.length - 1]!.t - samples[0]!.t
         : 0;
 
   // ----------------------------------------------------------
@@ -311,13 +311,13 @@ function computeRor(tempArr: number[], i: number): number | null {
 function resampleLinear(samples: RoastSample[], stepSec: number): RoastSample[] {
   if (samples.length < 2) return samples;
   const out: RoastSample[] = [];
-  const tStart = samples[0].t;
-  const tEnd = samples[samples.length - 1].t;
+  const tStart = samples[0]!.t;
+  const tEnd = samples[samples.length - 1]!.t;
   let j = 0;
   for (let t = tStart; t <= tEnd + 0.0001; t = +(t + stepSec).toFixed(3)) {
     // advance j until samples[j+1].t >= t
-    while (j + 1 < samples.length && samples[j + 1].t < t) j++;
-    const a = samples[j];
+    while (j + 1 < samples.length && samples[j + 1]!.t < t) j++;
+    const a = samples[j]!;
     const b = samples[j + 1] ?? a;
     if (a.t === b.t || j + 1 >= samples.length) {
       out.push({ ...a, t: +t.toFixed(3) });
@@ -328,7 +328,7 @@ function resampleLinear(samples: RoastSample[], stepSec: number): RoastSample[] 
       t: +t.toFixed(3),
       bt: +lerp(a.bt, b.bt, f).toFixed(2),
       et: +lerp(a.et, b.et, f).toFixed(2),
-      ror: a.ror != null && b.ror != null ? +lerp(a.ror, b.ror, f).toFixed(2) : a.ror ?? b.ror,
+      ror: a.ror != null && b.ror != null ? +lerp(a.ror!, b.ror!, f).toFixed(2) : a.ror ?? b.ror,
     });
   }
   return out;

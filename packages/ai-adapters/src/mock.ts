@@ -35,9 +35,12 @@ export class MockAdapter implements AIProvider {
     // ---- 2) RoR stability: std-dev of (BT[i+1] - BT[i]) across the curve ----
     const rorDeltas: number[] = [];
     for (let i = 1; i < samples.length; i++) {
-      const dt = samples[i].t - samples[i - 1].t;
+      const cur = samples[i];
+      const prev = samples[i - 1];
+      if (!cur || !prev) continue;
+      const dt = cur.t - prev.t;
       if (dt <= 0) continue;
-      const dBT = samples[i].bt - samples[i - 1].bt;
+      const dBT = cur.bt - prev.bt;
       rorDeltas.push((dBT / dt) * 60); // °C/min
     }
     const mean = rorDeltas.reduce((a, b) => a + b, 0) / Math.max(1, rorDeltas.length);
@@ -88,7 +91,7 @@ export class MockAdapter implements AIProvider {
       `Mock analysis of a ${(req.durationSec / 60).toFixed(1)}-min roast${req.machine ? ` on a ${req.machine.manufacturer} ${req.machine.model}` : ''}.`,
       `Development was ${devPct.toFixed(1)}% (target 18–22%) with RoR stability ${rorStabilityScore.toFixed(1)}/10.`,
       `Peak BT reached ${peakBT.toFixed(1)}°C.`,
-      `${issues.length === 1 && issues[0].startsWith('No major') ? 'Overall execution looks clean.' : `${issues.length} observation(s) and ${recommendations.length} recommendation(s) below.`}`,
+      `${issues.length === 1 && issues[0]?.startsWith('No major') ? 'Overall execution looks clean.' : `${issues.length} observation(s) and ${recommendations.length} recommendation(s) below.`}`,
     ].join(' ');
 
     return {

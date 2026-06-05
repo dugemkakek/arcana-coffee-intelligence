@@ -7,8 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-06-05
+
 ### Added
-- **Sidebar + Inventory + Plan pages (v0.3.x)**
+- **Sidebar + Inventory + Plan pages**
   - Replaced the top-nav with a left sidebar (`components/AppShell.tsx`). Four tabs: Live, Roasts, Inventory, Plan. Active tab computed via `usePathname()`. Mobile (<lg) collapses to a horizontal scrollable top strip.
   - **Inventory page** (`/inventory`) — two-tab view (Green / Roasted). Green tab: list of `GreenLot` rows with a current-vs-initial stock progress bar; inline "Add lot" form (code, name, origin, region, farm, variety, process, initial kg). Roasted tab: list of `RoastedInventory` rows by product+location; inline "Add product" form + "Manual adjustment" form (delta kg, reason select, optional ref).
   - **Plan page** (`/plan`) — server-rendered digest in three cards: Stock alerts (`onHandKg < 1.0`), Roast next (FIFO of oldest 5 active green lots), Recent roasts (last 5). No JS required to view.
@@ -16,14 +18,55 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `lib/api.ts` extended with typed clients for the new endpoints.
   - New client components: `AddGreenLotForm`, `AddProductForm`, `AdjustRoastedForm`. All use React Query mutations and invalidate the relevant query keys on success.
   - `package.json` bumps to v0.3.0 in the sidebar footer.
-- **Two-channel BT/ET Phidget mapping (v0.2.x)**
-  - `PhidgetManager` refactored to open two TMP1101 sensors (one for BT, one for ET) on the same VINT Hub instead of guessing ET as `BT + 15°C`
-  - Auto-discovery: if `BT_DEVICE_SERIAL` / `ET_DEVICE_SERIAL` are unset, the first / second TMP1101 found on the hub are used
-  - `LiveSample` shape extended with `etEstimated`, `btChannel`, `etChannel` flags so the UI can tell real readings from estimates
-  - Graceful degradation: if only 1 sensor is found, ET falls back to `BT + 15°C` with `etEstimated: true`
-  - Simulator marked `etEstimated: false` (it always generates both channels)
-  - Live UI shows a yellow "Exhaust temp is estimated" banner when `etEstimated` is true
-  - `.env.example` documents the new `BT_DEVICE_SERIAL` / `ET_DEVICE_SERIAL` env vars
+
+## [0.2.0] - 2026-06-05
+
+### Added
+- **Live Phidget capture**
+  - Server-side Phidget module with two interchangeable `TemperatureSource` implementations:
+    - `RoastSimulator` — realistic synthetic roast curve (light/medium/dark profiles). Default in dev.
+    - `PhidgetManager` — wraps the `phidget22` npm package, discovers attached TMP1101 thermocouple modules, opens them on demand.
+  - `LiveSessionStore` (singleton) — holds the active live roast in memory, buffers samples + events, persists to Prisma with `source='live'` on stop.
+  - REST endpoints under `/api/live/`:
+    - `GET /api/live/source` — info about the active temperature source
+    - `GET /api/live/devices` — list available devices
+    - `POST /api/live/connect` `{deviceId}` — connect to a device (e.g. `simulator`)
+    - `POST /api/live/disconnect`
+    - `POST /api/live/sessions/start` `{greenLotId?, greenLotName?, operatorUserId?}` → `{sessionId, startedAt, greenLot}`
+    - `POST /api/live/sessions/event` `{type, value?}` → `{t}` (charge, tp, dry_end, fc_start, fc_end, sc_start, sc_end, drop, cool, note)
+    - `POST /api/live/sessions/stop` → `{roastId}`
+  - WebSocket `/ws/live` — bidirectional: server pushes `sample` / `event` / `state`, client can send `event` or `ping`.
+  - Server-side broadcast throttle: max 10 Hz so the UI doesn't drown in samples.
+- **Two-channel BT/ET Phidget mapping**
+  - `PhidgetManager` refactored to open two TMP1101 sensors (one for BT, one for ET) on the same VINT Hub instead of guessing ET as `BT + 15°C`.
+  - Auto-discovery: if `BT_DEVICE_SERIAL` / `ET_DEVICE_SERIAL` are unset, the first / second TMP1101 found on the hub are used.
+  - `LiveSample` shape extended with `etEstimated`, `btChannel`, `etChannel` flags.
+  - Graceful degradation: if only 1 sensor is found, ET falls back to `BT + 15°C` with `etEstimated: true`.
+  - Simulator marked `etEstimated: false` (it always generates both channels).
+  - Live UI shows a yellow "Exhaust temp is estimated" banner when `etEstimated` is true.
+  - `.env.example` documents the new `BT_DEVICE_SERIAL` / `ET_DEVICE_SERIAL` env vars.
+- **Live UI page** `apps/local-node/app/roasts/live/page.tsx`:
+  - 3-step workflow: device → session → events.
+  - Real-time SVG chart with event markers.
+  - Live KPI readout: elapsed, BT, ET, RoR (5s window), sample count.
+  - Event button row (10 buttons).
+  - "🔴 Live" button in the home page header.
+  - On stop, navigates to the persisted roast's detail page.
+- `phidget22@^3.25.1` and `@fastify/websocket@^11.2.0` dependencies added.
+- `RoastSummary.machine` field added so the home + detail pages can show the roaster model.
+- `MockAdapter` (deterministic offline AI provider) for testing without an API key.
+- `CONTRIBUTING.md` with setup, conventions, and project layout.
+
+### Fixed
+- **Code review pass** (from `arcana-coffee-intelligence-review.md`):
+  - `package.json` — `clean` script now uses `rimraf` for Windows compat.
+  - `package.json` — `dev` script runs `prisma:generate` first so the Prisma client is ready before any service starts.
+  - `package.json` — `build` script uses explicit pnpm filter ordering so dependent packages build before consumers.
+  - `tsconfig.base.json` — `verbatimModuleSyntax: true` (companion to `moduleResolution: "Bundler"`); added `noImplicitReturns` and `noUncheckedIndexedAccess`.
+  - `.env.example` — `MINIMAX_BASE_URL` lowercased; `LOCAL_NODE_PORT` renamed to `LOCAL_NODE_API_PORT` for clarity; server + electron main + dev.sh updated to match.
+  - `.gitignore` — removed duplicate `.DS_Store` entry.
+  - `CHANGELOG.md` — `[Unreleased]` contents moved to `[0.2.0]` so it actually represents shipped work; URL comparison footnotes at the bottom.
+- `prisma generate` was required as a separate step before any service could start; now wired into `pnpm dev`.
 
 ## [0.1.0] - 2026-06-02
 
@@ -74,3 +117,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Supplier marketplace module is deferred
 - Kaffelogic `.klog` native import is deferred (closed format, no public spec)
 - Live Phidget capture is deferred to v0.2+
+
+[Unreleased]: https://github.com/dugemkakek/arcana-coffee-intelligence/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/dugemkakek/arcana-coffee-intelligence/compare/v0.1.0...v0.2.0
+[0.1.0]: https://github.com/dugemkakek/arcana-coffee-intelligence/releases/tag/v0.1.0

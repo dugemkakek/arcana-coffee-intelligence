@@ -76,7 +76,10 @@ function downsample<T>(arr: T[], target: number): T[] {
   if (arr.length <= target) return arr;
   const step = Math.ceil(arr.length / target);
   const out: T[] = [];
-  for (let i = 0; i < arr.length; i += step) out.push(arr[i]);
+  for (let i = 0; i < arr.length; i += step) {
+    const v = arr[i];
+    if (v !== undefined) out.push(v);
+  }
   return out;
 }
 

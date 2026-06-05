@@ -14,7 +14,7 @@ const isDev = !!process.env.ARCANA_DEV;
 const APP_ROOT = path.join(__dirname, '..');
 const SERVER_ENTRY = path.join(APP_ROOT, 'dist', 'server', 'index.js');
 const UI_PORT = process.env.LOCAL_NODE_UI_PORT ?? '3000';
-const SERVER_PORT = process.env.LOCAL_NODE_PORT ?? '4000';
+const SERVER_PORT = process.env.LOCAL_NODE_API_PORT ?? '4000';
 const UI_URL = process.env.ARCANA_DEV_UI_URL ?? `http://localhost:${UI_PORT}`;
 
 let mainWindow = null;
@@ -56,7 +56,7 @@ async function startServer() {
   }
   console.log('[main] starting Fastify server…');
   serverProcess = spawn(process.execPath, [SERVER_ENTRY], {
-    env: { ...process.env, LOCAL_NODE_PORT: SERVER_PORT, NODE_ENV: 'production' },
+    env: { ...process.env, LOCAL_NODE_API_PORT: SERVER_PORT, NODE_ENV: 'production' },
     stdio: ['ignore', 'pipe', 'pipe'],
   });
   serverProcess.stdout?.on('data', (d) => process.stdout.write(`[server] ${d}`));

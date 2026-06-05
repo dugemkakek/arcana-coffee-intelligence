@@ -6,7 +6,7 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 echo "▶ local-node dev"
-echo "  - API: http://localhost:${LOCAL_NODE_PORT:-4000}"
+echo "  - API: http://localhost:${LOCAL_NODE_API_PORT:-4000}"
 echo "  - UI : http://localhost:3000"
 
 # Start server in background

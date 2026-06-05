@@ -10,10 +10,10 @@
   },
   "packageManager": "pnpm@9.12.0",
   "scripts": {
-    "dev": "pnpm -r --parallel --stream run dev",
+    "dev": "pnpm prisma:generate && pnpm -r --parallel --stream run dev",
     "dev:local-node": "pnpm --filter @arcana/local-node dev",
     "dev:ai-service": "pnpm --filter @arcana/ai-service dev",
-    "build": "pnpm -r run build",
+    "build": "pnpm prisma:generate && pnpm --filter @arcana/shared-types build && pnpm --filter @arcana/db-local build && pnpm --filter @arcana/importers build && pnpm --filter @arcana/ai-adapters build && pnpm --filter @arcana/ai-service build && pnpm --filter @arcana/local-node build",
     "typecheck": "pnpm -r run typecheck",
     "test": "pnpm -r run test",
     "lint": "pnpm -r run lint",
@@ -23,8 +23,8 @@
     "prisma:studio": "pnpm --filter @arcana/db-local prisma studio",
     "prisma:generate": "pnpm --filter @arcana/db-local prisma generate",
     "dist:win": "pnpm --filter @arcana/local-node dist:win",
-    "clean": "pnpm -r exec rm -rf node_modules dist .next .turbo",
-    "changelog": "conventional-changelog -p angular -i CHANGELOG.md -s -r 0"
+    "clean": "pnpm -r exec rimraf node_modules dist .next .turbo",
+    "changelog": "conventional-changelog -p angular -i CHANGELOG.md -s"
   },
   "devDependencies": {
     "@types/node": "^20.14.0",

@@ -39,7 +39,7 @@ export default function RoastDetailPage({ params }: { params: Promise<{ id: stri
       </div>
     );
   }
-  const roast = roastQ.data;
+  const roast = roastQ.data!;
 
   // --- Derived stats ----------------------------------------------------
   const eventMarkers = roast.events.map((e) => ({

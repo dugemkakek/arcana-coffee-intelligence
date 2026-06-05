@@ -114,9 +114,9 @@ export function RoastChart({ samples, events }: Props) {
             <Tooltip
               contentStyle={{ backgroundColor: '#faf6f1', border: '1px solid #dcc4a0', borderRadius: 4, fontSize: 12 }}
               labelFormatter={(t) => `t = ${Math.floor(Number(t) / 60)}:${(Number(t) % 60).toString().padStart(2, '0')}`}
-              formatter={(value: number | null, name: string) => [
-                value != null ? value.toFixed(1) : '—',
-                name,
+              formatter={(value, name) => [
+                typeof value === 'number' ? value.toFixed(1) : '—',
+                String(name),
               ]}
             />
             <Legend

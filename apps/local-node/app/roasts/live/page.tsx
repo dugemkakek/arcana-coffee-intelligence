@@ -431,7 +431,7 @@ function LiveChart({ samples, events }: { samples: LiveSample[]; events: Array<{
   const PAD_B = 36;
 
   const tMin = 0;
-  const tMax = Math.max(60, samples[samples.length - 1].t + 5);
+  const tMax = Math.max(60, samples[samples.length - 1]!.t + 5);
   const tRange = tMax - tMin;
   const yMin = 60;
   const yMax = 240;
@@ -528,12 +528,13 @@ function formatMinSec(sec: number): string {
 /** RoR via 30s backward difference on BT. °C/min. */
 function computeRoR(samples: LiveSample[]): number | null {
   if (samples.length < 2) return null;
-  const last = samples[samples.length - 1];
+  const last = samples[samples.length - 1]!;
   // find sample ~30s before last
   let j = samples.length - 1;
-  while (j > 0 && last.t - samples[j].t < 30) j--;
+  while (j > 0 && last.t - samples[j]!.t < 30) j--;
   if (j === samples.length - 1) return null;
-  const dt = last.t - samples[j].t;
+  const ref = samples[j]!;
+  const dt = last.t - ref.t;
   if (dt <= 0) return null;
-  return ((last.bt - samples[j].bt) / dt) * 60;
+  return ((last.bt - ref.bt) / dt) * 60;
 }

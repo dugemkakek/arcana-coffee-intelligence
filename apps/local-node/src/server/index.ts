@@ -50,7 +50,7 @@ import { liveSession } from './live/session.js';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-const PORT = Number(process.env.LOCAL_NODE_PORT ?? 4000);
+const PORT = Number(process.env.LOCAL_NODE_API_PORT ?? 4000);
 const HOST = process.env.LOCAL_NODE_HOST ?? '0.0.0.0';
 const AI_SERVICE_URL = process.env.AI_SERVICE_URL ?? 'http://localhost:4001';
 const SAMPLES_DIR = join(__dirname, '..', '..', 'public', 'samples');
@@ -350,8 +350,8 @@ async function main() {
       roastedWeightKg: roast.roastedWeightKg ?? undefined,
       durationSec:
         allSamples.length > 0
-          ? (allSamples[allSamples.length - 1].timestampMs -
-              allSamples[0].timestampMs) /
+          ? (allSamples[allSamples.length - 1]!.timestampMs -
+              allSamples[0]!.timestampMs) /
             1000
           : 0,
       notes: roast.notes ?? roast.greenLot.name,

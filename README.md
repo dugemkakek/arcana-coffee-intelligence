@@ -58,21 +58,27 @@ Detailed C4 diagrams in [`docs/architecture/`](./docs/architecture/).
 ```bash
 # 1. Install Node 20 + pnpm 9
 nvm use          # picks up .nvmrc
-npm install -g pnpm@9
+corepack enable
+corepack prepare pnpm@9.12.0 --activate
 
 # 2. Install deps
 pnpm install
 
 # 3. Configure env
 cp .env.example .env
-# Edit .env: set DATABASE_URL_LOCAL + MINIMAX_API_KEY
+# `AI_PROVIDER=mock` is the default in .env.example — that means the full
+# import + analyze + display flow works with NO API key, using a
+# deterministic offline adapter. Only set MINIMAX_API_KEY (or
+# ANTHROPIC_API_KEY etc.) when you want real AI analysis.
 
-# 4. Set up the local DB
+# 4. Set up the local DB (creates packages/db-local/prisma/dev.db)
 pnpm prisma:migrate
+pnpm --filter @arcana/db-local prisma db seed   # optional demo data
 
 # 5. Run both services
 pnpm dev
 # → local-node UI  : http://localhost:3000
+# → local-node API : http://localhost:4000
 # → ai-service API : http://localhost:4001
 
 # 6. Try the import flow
